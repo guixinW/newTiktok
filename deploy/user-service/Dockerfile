@@ -1,6 +1,6 @@
 # Stage 1: Builder
 # This stage builds the Go application into a static binary.
-FROM golang:1.21-alpine AS builder
+FROM golang:1.23-alpine AS builder
 
 # Set the working directory inside the container
 WORKDIR /app
