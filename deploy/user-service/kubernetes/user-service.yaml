@@ -8,11 +8,11 @@ data:
     port: "50051"
     log_level: "info"
     database:
-      # Use host.docker.internal to connect to the host machine from inside the kind cluster
-      dsn: "root:123456@tcp(host.docker.internal:3306)/newTik?charset=utf8mb4&parseTime=True&loc=Local"
+      # Connect to the mysql service running inside the cluster
+      dsn: "root:123456@tcp(mysql:3306)/newTik?charset=utf8mb4&parseTime=True&loc=Local"
     redis:
-      # Use host.docker.internal here as well
-      address: "host.docker.internal:6379"
+      # Connect to the redis service running inside the cluster
+      address: "redis:6379"
       password: ""
       db: 0
 ---

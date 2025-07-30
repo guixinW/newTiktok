@@ -1,0 +1,64 @@
+# Service to expose MySQL within the cluster
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql
+spec:
+  ports:
+  - port: 3306
+  selector:
+    app: mysql
+  # ClusterIP is the default, but we specify it for clarity.
+  # This service will only be reachable from within the Kubernetes cluster.
+  type: ClusterIP
+---
+# PersistentVolumeClaim to request storage for MySQL data
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mysql-pvc
+spec:
+  # The default 'standard' storage class in kind will provision storage
+  # from the host filesystem.
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi # Request 1 Gigabyte of storage
+---
+# Deployment for the MySQL server
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mysql-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mysql
+  template:
+    metadata:
+      labels:
+        app: mysql
+    spec:
+      containers:
+      - name: mysql
+        image: mysql:8.0
+        ports:
+        - containerPort: 3306
+        # Set environment variables for MySQL configuration.
+        # IMPORTANT: For a real production environment, these secrets should be
+        # managed with Kubernetes Secrets, not plain text.
+        env:
+        - name: MYSQL_ROOT_PASSWORD
+          value: "123456"
+        - name: MYSQL_DATABASE
+          value: "newTik"
+        volumeMounts:
+        - name: mysql-persistent-storage
+          # Mount the persistent volume at the location where MySQL stores its data.
+          mountPath: /var/lib/mysql
+      volumes:
+      - name: mysql-persistent-storage
+        persistentVolumeClaim:
+          claimName: mysql-pvc
