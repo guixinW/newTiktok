@@ -27,12 +27,19 @@ type Redis struct {
 
 // LoadConfig reads configuration from file or environment variables.
 func LoadConfig() (config Config, err error) {
+	// For containerized environments, we specify the full path.
+	// The Kubernetes manifest mounts the config file to /app/config.yaml
+	viper.SetConfigFile("/app/config.yaml")
+
+	// For local development, we can still search for the file.
 	viper.AddConfigPath(".")
 	viper.SetConfigName("config")
 	viper.SetConfigType("yaml")
 
 	viper.AutomaticEnv()
 
+	// ReadInConfig will now use the path from SetConfigFile if it exists,
+	// otherwise it will search in the paths from AddConfigPath.
 	err = viper.ReadInConfig()
 	if err != nil {
 		return
