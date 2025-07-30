@@ -1,0 +1,12 @@
+# IDEs and editors
+.idea/
+.vscode/
+*.swp
+*~
+
+# Binaries
+newTiktoken
+user_service
+
+# OS-specific
+.DS_Store
