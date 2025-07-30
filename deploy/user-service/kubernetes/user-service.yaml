@@ -1,0 +1,66 @@
+# ConfigMap to hold application configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: user-service-config
+data:
+  config.yaml: |
+    port: "50051"
+    log_level: "info"
+    database:
+      # Use host.docker.internal to connect to the host machine from inside the kind cluster
+      dsn: "root:123456@tcp(host.docker.internal:3306)/newTik?charset=utf8mb4&parseTime=True&loc=Local"
+    redis:
+      # Use host.docker.internal here as well
+      address: "host.docker.internal:6379"
+      password: ""
+      db: 0
+---
+# Deployment for the user service
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: user-service-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: user-service
+  template:
+    metadata:
+      labels:
+        app: user-service
+    spec:
+      containers:
+      - name: user-service
+        image: user-service:latest
+        # 'imagePullPolicy: Never' is important for kind.
+        # It tells Kubernetes to use the local image we load, not to pull from a remote registry.
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 50051
+        volumeMounts:
+        - name: config-volume
+          # Mount the config file into the app's working directory
+          mountPath: /app/config.yaml
+          subPath: config.yaml
+      volumes:
+      - name: config-volume
+        configMap:
+          name: user-service-config
+---
+# Service to expose the user service deployment
+apiVersion: v1
+kind: Service
+metadata:
+  name: user-service
+spec:
+  # NodePort makes the service accessible from the host machine.
+  type: NodePort
+  selector:
+    app: user-service
+  ports:
+  - protocol: TCP
+    port: 50051       # Port inside the cluster
+    targetPort: 50051  # Port on the pod
+    # nodePort: 30051    # Optional: specify a fixed port to access from the host
