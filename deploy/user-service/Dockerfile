@@ -5,17 +5,26 @@ FROM golang:1.23-alpine AS builder
 # Set the working directory inside the container
 WORKDIR /app
 
+# Accept proxy settings as build arguments
+ARG HTTP_PROXY
+ARG HTTPS_PROXY
+
 # Copy go.mod and go.sum files to download dependencies first
 COPY go.mod go.sum ./
-# Unset proxy settings that may be inherited from the host
-RUN GOPROXY=direct go mod download
+
+# Use the proxy arguments when running go mod download
+RUN export http_proxy=${HTTP_PROXY} && \
+    export https_proxy=${HTTPS_PROXY} && \
+    go mod download
 
 # Copy the entire source code
 COPY . .
 
 # Build the application, creating a statically linked binary.
-# The output is placed in the /app directory.
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o /app/user_service ./cmd/user_service/main.go
+# Ensure the proxy is also available for the build step if needed.
+RUN export http_proxy=${HTTP_PROXY} && \
+    export https_proxy=${HTTPS_PROXY} && \
+    CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o /app/user_service ./cmd/user_service/main.go
 
 # Stage 2: Final
 # This stage creates the final, small, and secure image.
