@@ -36,8 +36,11 @@ WORKDIR /app
 # Copy the built binary from the builder stage
 COPY --from=builder /app/user_service .
 
-# The application looks for 'config.yaml' in the current directory.
-# This file will be provided by a Kubernetes ConfigMap.
+# --- FIX ---
+# Copy a default config file into the image.
+# This ensures the application can always start.
+# It can be overridden by a Kubernetes ConfigMap volume mount if present.
+COPY config.yaml .
 
 # Expose the port the gRPC server listens on
 EXPOSE 50051
