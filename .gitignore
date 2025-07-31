@@ -4,6 +4,8 @@
 *.swp
 *~
 
+/dev
+
 # Binaries
 newTiktoken
 user_service

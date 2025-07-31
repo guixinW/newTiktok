@@ -1,21 +1,3 @@
-# ConfigMap to hold application configuration
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: user-service-config
-data:
-  config.yaml: |
-    port: "50051"
-    log_level: "info"
-    database:
-      # Connect to the mysql service running inside the cluster
-      dsn: "root:123456@tcp(mysql:3306)/newTik?charset=utf8mb4&parseTime=True&loc=Local"
-    redis:
-      # Connect to the redis service running inside the cluster
-      address: "redis:6379"
-      password: ""
-      db: 0
----
 # Deployment for the user service
 apiVersion: apps/v1
 kind: Deployment
@@ -39,6 +21,9 @@ spec:
         imagePullPolicy: Never
         ports:
         - containerPort: 50051
+        env:
+          - name: CONFIG_PATH
+            value: "/app/config.yaml"
         volumeMounts:
         - name: config-volume
           # Mount the config file into the app's working directory

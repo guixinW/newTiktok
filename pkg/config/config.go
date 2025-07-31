@@ -3,6 +3,7 @@ package config
 import (
 	"github.com/spf13/viper"
 	"log"
+	"os"
 )
 
 // Config holds all configuration for the application.
@@ -29,13 +30,12 @@ type Redis struct {
 func LoadConfig() (config Config, err error) {
 	// For containerized environments, we specify the full path.
 	// The Kubernetes manifest mounts the config file to /app/config.yaml
-	viper.SetConfigFile("/app/config.yaml")
-
-	// For local development, we can still search for the file.
-	viper.AddConfigPath(".")
-	viper.SetConfigName("config")
+	configPath := os.Getenv("CONFIG_PATH")
+	if configPath == "" {
+		configPath = "config.yaml" // 默认在当前目录下查找 config.yaml
+	}
+	viper.SetConfigFile(configPath)
 	viper.SetConfigType("yaml")
-
 	viper.AutomaticEnv()
 
 	// ReadInConfig will now use the path from SetConfigFile if it exists,
