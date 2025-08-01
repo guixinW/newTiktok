@@ -1,0 +1,66 @@
+# Deployment for the video service
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: video-service-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: video-service
+  template:
+    metadata:
+      labels:
+        app: video-service
+    spec:
+      containers:
+      - name: video-service
+        image: video-service:latest
+        # 'imagePullPolicy: Never' is important for local development with tools like 'kind'.
+        # It tells Kubernetes to use the local image, not pull from a remote registry.
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 50052 # Port for video service
+        env:
+          - name: CONFIG_PATH
+            value: "/app/config.yaml"
+        volumeMounts:
+        - name: config-volume
+          mountPath: /app/config.yaml
+          subPath: config.yaml
+      volumes:
+      - name: config-volume
+        configMap:
+          name: video-service-config
+---
+# Service to expose the video service deployment
+apiVersion: v1
+kind: Service
+metadata:
+  name: video-service
+spec:
+  type: NodePort
+  selector:
+    app: video-service
+  ports:
+  - protocol: TCP
+    port: 50052       # Port inside the cluster
+    targetPort: 50052  # Port on the pod
+---
+# ConfigMap for video service configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: video-service-config
+data:
+  config.yaml: |
+    # Configuration for the video service
+    server:
+      port: 50052
+    # Add other necessary configurations, for example, database or other service endpoints
+    # database:
+    #   host: "mysql-video"
+    #   port: 3306
+    #   user: "video_user"
+    #   password: "password"
+    #   dbname: "video_db"
