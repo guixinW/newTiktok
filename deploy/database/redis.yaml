@@ -1,33 +1,23 @@
-# Service to expose Redis within the cluster
+# Headless Service for the Redis StatefulSet
 apiVersion: v1
 kind: Service
 metadata:
   name: redis
 spec:
   ports:
-  - port: 6379
+    - port: 6379
   selector:
     app: redis
-  type: ClusterIP
+  # A headless service is required for the StatefulSet.
+  clusterIP: None
 ---
-# PersistentVolumeClaim to request storage for Redis data
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: redis-pvc
-spec:
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: 256Mi # Request 256 Megabytes of storage
----
-# Deployment for the Redis server
+# StatefulSet for the Redis server
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
-  name: redis-deployment
+  name: redis
 spec:
+  serviceName: "redis"
   replicas: 1
   selector:
     matchLabels:
@@ -38,17 +28,22 @@ spec:
         app: redis
     spec:
       containers:
-      - name: redis
-        image: redis:7-alpine
-        # Use a command to start Redis with append-only file persistence enabled.
-        command: ["redis-server", "--appendonly", "yes"]
-        ports:
-        - containerPort: 6379
-        volumeMounts:
-        - name: redis-persistent-storage
-          # Mount the persistent volume at the location where Redis stores its data.
-          mountPath: /data
-      volumes:
-      - name: redis-persistent-storage
-        persistentVolumeClaim:
-          claimName: redis-pvc
+        - name: redis
+          image: redis:7-alpine
+          # Use a command to start Redis with append-only file persistence enabled.
+          command: ["redis-server", "--appendonly", "yes"]
+          ports:
+            - containerPort: 6379
+          volumeMounts:
+            - name: redis-persistent-storage
+              # Mount the persistent volume at the location where Redis stores its data.
+              mountPath: /data
+  # volumeClaimTemplates create a dedicated PVC for each Redis pod.
+  volumeClaimTemplates:
+    - metadata:
+        name: redis-persistent-storage
+      spec:
+        accessModes: [ "ReadWriteOnce" ]
+        resources:
+          requests:
+            storage: 256Mi

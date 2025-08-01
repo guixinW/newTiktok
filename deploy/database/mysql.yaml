@@ -1,37 +1,27 @@
-# Service to expose MySQL within the cluster
+# Headless Service for the MySQL StatefulSet
+# A StatefulSet requires a "headless" service to control the network domain of its pods.
+# This allows each pod to get a unique, stable DNS name (e.g., mysql-0.mysql).
 apiVersion: v1
 kind: Service
 metadata:
   name: mysql
 spec:
   ports:
-  - port: 3306
+    - port: 3306
   selector:
     app: mysql
-  # ClusterIP is the default, but we specify it for clarity.
-  # This service will only be reachable from within the Kubernetes cluster.
-  type: ClusterIP
+  # By setting clusterIP to None, we make this a headless service.
+  clusterIP: None
 ---
-# PersistentVolumeClaim to request storage for MySQL data
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: mysql-pvc
-spec:
-  # The default 'standard' storage class in kind will provision storage
-  # from the host filesystem.
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: 1Gi # Request 1 Gigabyte of storage
----
-# Deployment for the MySQL server
+# StatefulSet for the MySQL server
+# This replaces the previous Deployment and separate PersistentVolumeClaim.
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
-  name: mysql-deployment
+  name: mysql
 spec:
+  # The serviceName must match the name of the headless service defined above.
+  serviceName: "mysql"
   replicas: 1
   selector:
     matchLabels:
@@ -42,23 +32,27 @@ spec:
         app: mysql
     spec:
       containers:
-      - name: mysql
-        image: mysql:8.0
-        ports:
-        - containerPort: 3306
-        # Set environment variables for MySQL configuration.
-        # IMPORTANT: For a real production environment, these secrets should be
-        # managed with Kubernetes Secrets, not plain text.
-        env:
-        - name: MYSQL_ROOT_PASSWORD
-          value: "123456"
-        - name: MYSQL_DATABASE
-          value: "newTik"
-        volumeMounts:
-        - name: mysql-persistent-storage
-          # Mount the persistent volume at the location where MySQL stores its data.
-          mountPath: /var/lib/mysql
-      volumes:
-      - name: mysql-persistent-storage
-        persistentVolumeClaim:
-          claimName: mysql-pvc
+        - name: mysql
+          image: mysql:8.0
+          ports:
+            - containerPort: 3306
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              value: "123456"
+            - name: MYSQL_DATABASE
+              value: "newTik"
+          volumeMounts:
+            # This name must match the name of the volumeClaimTemplate below.
+            - name: mysql-persistent-storage
+              mountPath: /var/lib/mysql
+  # volumeClaimTemplates dynamically create a PersistentVolumeClaim for each pod.
+  # This ensures each MySQL pod gets its own stable, persistent storage.
+  # This replaces the need for a separate PVC resource.
+  volumeClaimTemplates:
+    - metadata:
+        name: mysql-persistent-storage
+      spec:
+        accessModes: [ "ReadWriteOnce" ]
+        resources:
+          requests:
+            storage: 1Gi

@@ -12,7 +12,7 @@ import (
 // GormUser 是用于 GORM 的用户模型
 type GormUser struct {
 	ID             uint64 `gorm:"primaryKey"`
-	Username       string `gorm:"uniqueIndex"`
+	Username       string `gorm:"type:varchar(255);uniqueIndex"`
 	HashedPassword string
 	FollowingCount uint64
 	FollowerCount  uint64

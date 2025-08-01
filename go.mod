@@ -6,6 +6,7 @@ toolchain go1.23.3
 
 require (
 	github.com/go-redis/redis/v8 v8.11.5
+	github.com/spf13/viper v1.20.1
 	google.golang.org/grpc v1.74.2
 	google.golang.org/protobuf v1.36.6
 	gorm.io/driver/mysql v1.6.0
@@ -27,7 +28,6 @@ require (
 	github.com/spf13/afero v1.12.0 // indirect
 	github.com/spf13/cast v1.7.1 // indirect
 	github.com/spf13/pflag v1.0.6 // indirect
-	github.com/spf13/viper v1.20.1 // indirect
 	github.com/subosito/gotenv v1.6.0 // indirect
 	go.uber.org/atomic v1.9.0 // indirect
 	go.uber.org/multierr v1.9.0 // indirect
