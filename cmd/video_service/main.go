@@ -2,9 +2,7 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"net"
-	"os"
 
 	"github.com/go-redis/redis/v8"
 	"google.golang.org/grpc"
