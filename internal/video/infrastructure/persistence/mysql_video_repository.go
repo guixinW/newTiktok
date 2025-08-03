@@ -2,32 +2,102 @@ package persistence
 
 import (
 	"context"
-	"database/sql"
-	"fmt"
+	"errors"
+	"log/slog"
 	"newTiktoken/internal/video/domain/model"
+	"newTiktoken/internal/video/domain/repository"
 	"newTiktoken/pkg/userpb"
 	"time"
 
-	_ "github.com/go-sql-driver/mysql"
+	"gorm.io/gorm"
 )
 
-// MySQLVideoRepository is a MySQL-based implementation of the VideoRepository.
+// GormUser is a slimmed-down copy from the user persistence package.
+// In a real-world scenario, this might be in a shared package.
+type GormUser struct {
+	ID             uint64 `gorm:"primaryKey"`
+	Username       string `gorm:"type:varchar(255);uniqueIndex"`
+	FollowingCount uint64
+	FollowerCount  uint64
+	TotalFavorited uint64
+	WorkCount      uint64
+	FavoriteCount  uint64
+}
+
+func (GormUser) TableName() string {
+	return "users"
+}
+
+// GormVideo is the GORM model for a video.
+type GormVideo struct {
+	ID            uint64   `gorm:"primaryKey"`
+	AuthorID      uint64   `gorm:"index"`
+	Author        GormUser `gorm:"foreignKey:AuthorID"`
+	PlayURL       string   `gorm:"type:varchar(255)"`
+	FavoriteCount uint64
+	CommentCount  uint64
+	Title         string `gorm:"type:varchar(255)"`
+	ShareCount    uint64
+	CreatedAt     int64 `gorm:"autoCreateTime"`
+}
+
+func (GormVideo) TableName() string {
+	return "videos"
+}
+
+// toDomainModel converts the GORM video model to a domain model.
+// It also converts the nested GormUser to a userpb.User.
+func (g *GormVideo) toDomainModel() *model.Video {
+	return &model.Video{
+		ID: g.ID,
+		Author: &userpb.User{
+			Id:             g.Author.ID,
+			Name:           g.Author.Username, // Correctly map Username to Name
+			FollowingCount: g.Author.FollowingCount,
+			FollowerCount:  g.Author.FollowerCount,
+			TotalFavorite:  g.Author.TotalFavorited, // Correctly map TotalFavorited to TotalFavorite
+			WorkCount:      g.Author.WorkCount,
+			FavoriteCount:  g.Author.FavoriteCount,
+		},
+		PlayURL:       g.PlayURL,
+		FavoriteCount: g.FavoriteCount,
+		CommentCount:  g.CommentCount,
+		Title:         g.Title,
+		ShareCount:    g.ShareCount,
+		CreateAt:      uint64(g.CreatedAt),
+	}
+}
+
+// fromDomainModel converts a domain video model to a GORM model.
+func fromDomainModel(v *model.Video) *GormVideo {
+	return &GormVideo{
+		ID:            v.ID,
+		AuthorID:      v.Author.Id,
+		PlayURL:       v.PlayURL,
+		FavoriteCount: v.FavoriteCount,
+		CommentCount:  v.CommentCount,
+		Title:         v.Title,
+		ShareCount:    v.ShareCount,
+		CreatedAt:     int64(v.CreateAt),
+	}
+}
+
+// MySQLVideoRepository is a GORM-based implementation of the VideoRepository.
 type MySQLVideoRepository struct {
-	db *sql.DB
+	db  *gorm.DB
+	log *slog.Logger
 }
 
 // NewMySQLVideoRepository creates a new MySQLVideoRepository.
-// The dsn (Data Source Name) should be in the format: "user:password@tcp(127.0.0.1:3306)/dbname"
-func NewMySQLVideoRepository(dsn string) (*MySQLVideoRepository, error) {
-	db, err := sql.Open("mysql", dsn)
-	if err != nil {
+func NewMySQLVideoRepository(db *gorm.DB, log *slog.Logger) (repository.VideoRepository, error) {
+	if err := db.AutoMigrate(&GormVideo{}); err != nil {
+		log.Error("gorm auto migration failed", "table", GormVideo{}.TableName(), "error", err)
 		return nil, err
 	}
-	if err := db.Ping(); err != nil {
-		return nil, err
-	}
-	// You should run a schema migration script here to create the 'videos' table.
-	return &MySQLVideoRepository{db: db}, nil
+	return &MySQLVideoRepository{
+		db:  db,
+		log: log.With("repo", "mysql_video"),
+	}, nil
 }
 
 // Feed retrieves a list of videos from the database, ordered by creation time.
@@ -36,39 +106,22 @@ func (r *MySQLVideoRepository) Feed(ctx context.Context, latestTime int64) ([]*m
 		latestTime = time.Now().Unix()
 	}
 
-	// Query to get the latest 30 videos before the given timestamp
-	query := `
-		SELECT id, author_id, play_url, cover_url, title, create_at 
-		FROM videos 
-		WHERE create_at < FROM_UNIXTIME(?)
-		ORDER BY create_at DESC 
-		LIMIT 30`
+	var gormVideos []GormVideo
+	err := r.db.WithContext(ctx).
+		Preload("Author").
+		Where("created_at < ?", latestTime).
+		Order("created_at DESC").
+		Limit(30).
+		Find(&gormVideos).Error
 
-	rows, err := r.db.QueryContext(ctx, query, latestTime)
 	if err != nil {
-		return nil, 0, fmt.Errorf("failed to query feed: %w", err)
-	}
-	defer rows.Close()
-
-	var videos []*model.Video
-	for rows.Next() {
-		var v model.Video
-		var authorID uint64
-		var createAt time.Time
-		// Note: cover_url is in the proto but not in the domain model.
-		// This is a placeholder for where you would scan it if it were.
-		var coverURL string 
-
-		if err := rows.Scan(&v.ID, &authorID, &v.PlayURL, &coverURL, &v.Title, &createAt); err != nil {
-			return nil, 0, fmt.Errorf("failed to scan video row: %w", err)
-		}
-		v.Author = &userpb.User{Id: authorID} // In a real app, you'd fetch full author details
-		v.CreateAt = uint64(createAt.Unix())
-		videos = append(videos, &v)
+		r.log.Error("failed to query feed", "error", err)
+		return nil, 0, err
 	}
 
-	if err := rows.Err(); err != nil {
-		return nil, 0, fmt.Errorf("error during video rows iteration: %w", err)
+	videos := make([]*model.Video, len(gormVideos))
+	for i, gv := range gormVideos {
+		videos[i] = gv.toDomainModel()
 	}
 
 	var newNextTime int64
@@ -81,49 +134,38 @@ func (r *MySQLVideoRepository) Feed(ctx context.Context, latestTime int64) ([]*m
 
 // Create inserts a new video record into the database.
 func (r *MySQLVideoRepository) Create(ctx context.Context, video *model.Video) error {
-	query := "INSERT INTO videos (author_id, play_url, title, create_at) VALUES (?, ?, ?, FROM_UNIXTIME(?))"
-	_, err := r.db.ExecContext(ctx, query, video.Author.Id, video.PlayURL, video.Title, video.CreateAt)
+	gormVideo := fromDomainModel(video)
+	err := r.db.WithContext(ctx).Create(gormVideo).Error
 	if err != nil {
-		return fmt.Errorf("failed to insert video: %w", err)
+		r.log.Error("failed to create video", "author_id", video.Author.Id, "title", video.Title, "error", err)
+		return err
 	}
+	video.ID = gormVideo.ID // Update domain model with new ID
 	return nil
 }
 
 // ListByAuthorID retrieves all videos for a specific author from the database.
 func (r *MySQLVideoRepository) ListByAuthorID(ctx context.Context, authorID uint64) ([]*model.Video, error) {
-	query := `
-		SELECT id, author_id, play_url, cover_url, title, create_at 
-		FROM videos 
-		WHERE author_id = ? 
-		ORDER BY create_at DESC`
+	var gormVideos []GormVideo
+	err := r.db.WithContext(ctx).
+		Preload("Author").
+		Where("author_id = ?", authorID).
+		Order("created_at DESC").
+		Find(&gormVideos).Error
 
-	rows, err := r.db.QueryContext(ctx, query, authorID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to query videos by author: %w", err)
-	}
-	defer rows.Close()
-
-	var videos []*model.Video
-	for rows.Next() {
-		var v model.Video
-		var createAt time.Time
-		var coverURL string // Placeholder
-
-		if err := rows.Scan(&v.ID, &v.Author.Id, &v.PlayURL, &coverURL, &v.Title, &createAt); err != nil {
-			return nil, fmt.Errorf("failed to scan video row: %w", err)
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			r.log.Debug("no videos found for author", "author_id", authorID)
+			return []*model.Video{}, nil // Return empty slice instead of nil
 		}
-		v.CreateAt = uint64(createAt.Unix())
-		videos = append(videos, &v)
+		r.log.Error("failed to list videos by author", "author_id", authorID, "error", err)
+		return nil, err
 	}
 
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("error during video rows iteration: %w", err)
+	videos := make([]*model.Video, len(gormVideos))
+	for i, gv := range gormVideos {
+		videos[i] = gv.toDomainModel()
 	}
 
 	return videos, nil
-}
-
-// Close closes the database connection.
-func (r *MySQLVideoRepository) Close() {
-	r.db.Close()
 }

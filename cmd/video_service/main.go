@@ -10,6 +10,8 @@ import (
 	"github.com/go-redis/redis/v8"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
+	"gorm.io/driver/mysql"
+	"gorm.io/gorm"
 
 	"newTiktoken/internal/video/application"
 	"newTiktoken/internal/video/infrastructure/persistence"
@@ -31,13 +33,13 @@ func main() {
 	appLogger.Info("logger initialized")
 	appLogger.Info("starting video service...")
 
-	// 3. Initialize database connection (using old method for video service)
-	mysqlRepo, err := persistence.NewMySQLVideoRepository(cfg.Database.DSN)
+	// 3. Initialize database connection
+	db, err := gorm.Open(mysql.Open(cfg.Database.DSN), &gorm.Config{})
 	if err != nil {
-		appLogger.Error("failed to connect to mysql", "error", err)
+		appLogger.Error("failed to connect to database", "error", err)
 		os.Exit(1)
 	}
-	appLogger.Info("mysql repository initialized")
+	appLogger.Info("database connected")
 
 	// 4. Initialize Redis client
 	rdb := redis.NewClient(&redis.Options{
@@ -52,7 +54,14 @@ func main() {
 	appLogger.Info("redis connected")
 
 	// 5. Create and assemble repositories
-	// Note: The video service repositories do not currently accept a logger.
+	mysqlRepo, err := persistence.NewMySQLVideoRepository(db, appLogger)
+	if err != nil {
+		appLogger.Error("failed to initialize mysql video repository", "error", err)
+		os.Exit(1)
+	}
+	appLogger.Info("mysql repository initialized")
+
+	// Note: The video redis repository does not currently accept a logger.
 	cachedRepo := persistence.NewRedisVideoRepository(rdb, mysqlRepo)
 	appLogger.Info("redis cache repository initialized")
 

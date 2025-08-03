@@ -34,10 +34,10 @@ func (s *VideoService) Feed(ctx context.Context, latestTime int64, tokenUserID u
 
 	// Here you would enrich the video data, for example, by checking if the tokenUserID
 	// has favorited any of the videos. This is a placeholder for that logic.
-	for _, video := range videos {
-		// This is just an example, in a real app you would call a favorite service.
-		// video.IsFavorite = someFavoriteCheck(tokenUserID, video.ID)
-	}
+	//for _, video := range videos {
+	//	// This is just an example, in a real app you would call a favorite service.
+	//	// video.IsFavorite = someFavoriteCheck(tokenUserID, video.ID)
+	//}
 
 	return videos, nextTime, nil
 }
@@ -67,9 +67,9 @@ func (s *VideoService) PublishList(ctx context.Context, userID uint64, tokenUser
 	}
 
 	// Enrich video data, e.g., check for favorites by tokenUserID.
-	for _, video := range videos {
-		// This is just an example, in a real app you would call a favorite service.
-		// video.IsFavorite = someFavoriteCheck(tokenUserID, video.ID)
-	}
+	//for _, video := range videos {
+	//	// This is just an example, in a real app you would call a favorite service.
+	//	// video.IsFavorite = someFavoriteCheck(tokenUserID, video.ID)
+	//}
 	return videos, nil
 }
