@@ -1,14 +1,17 @@
 package main
 
 import (
+	"context"
 	"fmt"
+	"log"
 	"net"
+	"os"
 
 	"github.com/go-redis/redis/v8"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/reflection"
 
 	"newTiktoken/internal/video/application"
-	"newTiktoken/internal/video/domain/repository"
 	"newTiktoken/internal/video/infrastructure/persistence"
 	grpcvideo "newTiktoken/internal/video/interfaces/grpc"
 	"newTiktoken/pkg/config"
@@ -17,74 +20,67 @@ import (
 )
 
 func main() {
-	// Initialize logger
-	log := logger.New("video-service", "dev") // Or load level from config
-
-	// Load configuration
-	cfg, err := config.Load("config.yaml") // Ensure config.yaml is present
+	// 1. Load configuration
+	cfg, err := config.LoadConfig()
 	if err != nil {
-		log.Fatalf("Failed to load configuration: %v", err)
+		log.Fatalf("failed to load configuration: %v", err)
 	}
 
-	// Initialize repository based on config
-	repo, err := initRepo(cfg, log)
-	if err != nil {
-		log.Fatalf("Failed to initialize repository: %v", err)
-	}
+	// 2. Initialize logger
+	appLogger := logger.New(cfg.LogLevel)
+	appLogger.Info("logger initialized")
+	appLogger.Info("starting video service...")
 
-	// Start gRPC server
-	listenAddress := fmt.Sprintf(":%d", cfg.VideoService.Port)
-	lis, err := net.Listen("tcp", listenAddress)
-	if err != nil {
-		log.Fatalf("Failed to listen: %v", err)
-	}
-
-	// Dependency Injection
-	videoAppService := application.NewVideoService(repo)
-	grpcServer := grpc.NewServer()
-	videoServiceServer := grpcvideo.NewServer(videoAppService)
-	videopb.RegisterVideoServiceServer(grpcServer, videoServiceServer)
-
-	log.Infof("Video gRPC service starting on %s", listenAddress)
-
-	if err := grpcServer.Serve(lis); err != nil {
-		log.Fatalf("Failed to serve gRPC server: %v", err)
-	}
-}
-
-// initRepo initializes and returns the appropriate video repository based on the configuration.
-func initRepo(cfg *config.Config, log logger.Logger) (repository.VideoRepository, error) {
-	// Default to in-memory if no database is configured
-	if cfg.Database.DSN == "" {
-		log.Info("Using in-memory repository")
-		return persistence.NewInMemoryVideoRepository(), nil
-	}
-
-	// Initialize MySQL repository
-	log.Infof("Connecting to MySQL database...")
+	// 3. Initialize database connection (using old method for video service)
 	mysqlRepo, err := persistence.NewMySQLVideoRepository(cfg.Database.DSN)
 	if err != nil {
-		return nil, fmt.Errorf("failed to connect to MySQL: %w", err)
+		appLogger.Error("failed to connect to mysql", "error", err)
+		os.Exit(1)
 	}
-	log.Info("MySQL connection successful")
+	appLogger.Info("mysql repository initialized")
 
-	// If Redis is not configured, return the MySQL repository directly
-	if cfg.Redis.Addr == "" {
-		log.Info("Using MySQL repository without Redis cache")
-		return mysqlRepo, nil
-	}
-
-	// Initialize Redis client
-	log.Infof("Connecting to Redis at %s...", cfg.Redis.Addr)
-	redisClient := redis.NewClient(&redis.Options{
-		Addr: cfg.Redis.Addr,
+	// 4. Initialize Redis client
+	rdb := redis.NewClient(&redis.Options{
+		Addr:     cfg.Redis.Address,
+		Password: cfg.Redis.Password,
+		DB:       cfg.Redis.DB,
 	})
-	if _, err := redisClient.Ping(redisClient.Context()).Result(); err != nil {
-		return nil, fmt.Errorf("failed to connect to Redis: %w", err)
+	if _, err := rdb.Ping(context.Background()).Result(); err != nil {
+		appLogger.Error("failed to connect to redis", "error", err)
+		os.Exit(1)
 	}
-	log.Info("Redis connection successful")
+	appLogger.Info("redis connected")
 
-	// Wrap MySQL repository with Redis cache
-	log.Info("Using MySQL repository with Redis cache")
-	return persistence.NewRedisVideoRepository(redisClient, mysqlRepo), nil
+	// 5. Create and assemble repositories
+	// Note: The video service repositories do not currently accept a logger.
+	cachedRepo := persistence.NewRedisVideoRepository(rdb, mysqlRepo)
+	appLogger.Info("redis cache repository initialized")
+
+	// 6. Initialize application service
+	// Note: The video application service does not currently accept a logger.
+	videoApp := application.NewVideoService(cachedRepo)
+	appLogger.Info("video service application initialized")
+
+	// 7. Initialize gRPC server
+	// Note: The video gRPC server does not currently accept a logger or have an interceptor.
+	videoServiceServer := grpcvideo.NewServer(videoApp)
+	appLogger.Info("gRPC server initialized")
+
+	// 8. Create and register gRPC service
+	s := grpc.NewServer()
+	videopb.RegisterVideoServiceServer(s, videoServiceServer)
+	reflection.Register(s)
+
+	// 9. Start the service
+	lis, err := net.Listen("tcp", fmt.Sprintf(":%s", cfg.Port))
+	if err != nil {
+		appLogger.Error("failed to listen", "port", cfg.Port, "error", err)
+		os.Exit(1)
+	}
+
+	appLogger.Info("video service listening", "port", cfg.Port)
+	if err := s.Serve(lis); err != nil {
+		appLogger.Error("failed to serve gRPC server", "error", err)
+		os.Exit(1)
+	}
 }
