@@ -12,7 +12,7 @@ import (
 	"net"
 	"newTiktoken/internal/user/application"
 	"newTiktoken/internal/user/infrastructure/persistence"
-	grpc_interface "newTiktoken/internal/user/interfaces/grpc"
+	grpcinterface "newTiktoken/internal/user/interfaces/grpc"
 	"newTiktoken/pkg/config"
 	"newTiktoken/pkg/logger"
 	"newTiktoken/pkg/userpb"
@@ -68,7 +68,7 @@ func main() {
 	appLogger.Info("user service application initialized")
 
 	// 7. Initialize gRPC server (Interfaces)
-	grpcServer := grpc_interface.NewUserServer(userApp, appLogger)
+	grpcServer := grpcinterface.NewUserServer(userApp, appLogger)
 	appLogger.Info("gRPC server initialized")
 
 	// 8. Create and register gRPC service with interceptor

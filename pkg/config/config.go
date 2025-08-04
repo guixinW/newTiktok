@@ -8,10 +8,12 @@ import (
 
 // Config holds all configuration for the application.
 type Config struct {
-	Port     string   `mapstructure:"port"`
-	LogLevel string   `mapstructure:"log_level"`
-	Database Database `mapstructure:"database"`
-	Redis    Redis    `mapstructure:"redis"`
+	Port        string      `mapstructure:"port"`
+	LogLevel    string      `mapstructure:"log_level"`
+	Database    Database    `mapstructure:"database"`
+	Redis       Redis       `mapstructure:"redis"`
+	Gateway     Gateway     `mapstructure:"gateway"`
+	UserService UserService `mapstructure:"user_service"`
 }
 
 // Database holds all database configuration.
@@ -24,6 +26,16 @@ type Redis struct {
 	Address  string `mapstructure:"address"`
 	Password string `mapstructure:"password"`
 	DB       int    `mapstructure:"db"`
+}
+
+// Gateway holds all gateway configuration.
+type Gateway struct {
+	Port string `mapstructure:"port"`
+}
+
+// UserService holds user service configuration.
+type UserService struct {
+	Port string `mapstructure:"port"`
 }
 
 // LoadConfig reads configuration from file or environment variables.

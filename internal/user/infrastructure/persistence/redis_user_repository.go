@@ -3,6 +3,7 @@ package persistence
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/go-redis/redis/v8"
 	"log/slog"
@@ -91,7 +92,7 @@ func (r *redisUserRepository) findUserFromCacheOrNext(ctx context.Context, key s
 		r.log.Warn("failed to unmarshal user from cache", "key", key, "value", val)
 	}
 
-	if err != redis.Nil {
+	if !errors.Is(err, redis.Nil) {
 		r.log.Error("redis get error", "key", key, "error", err)
 	} else {
 		r.log.Debug("user cache miss", "key", key)
