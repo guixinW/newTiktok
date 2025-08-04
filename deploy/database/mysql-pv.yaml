@@ -1,0 +1,28 @@
+# mysql-pv.yaml
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: mysql-pv
+  labels:
+    type: local
+spec:
+  storageClassName: manual # 使用手动管理的存储类
+  capacity:
+    storage: 5Gi # 定义存储空间大小
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    # 这个路径必须和 kind 配置文件中 extraMounts.containerPath 一致
+    path: "/data/mysql"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mysql-pvc
+spec:
+  storageClassName: manual
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi

@@ -46,21 +46,3 @@ spec:
   - protocol: TCP
     port: 50052       # Port inside the cluster
     targetPort: 50052  # Port on the pod
----
-# ConfigMap for video service configuration
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: video-service-config
-data:
-  config.yaml: |
-    # Configuration for the video service
-    server:
-      port: 50052
-    # Add other necessary configurations, for example, database or other service endpoints
-    # database:
-    #   host: "mysql-video"
-    #   port: 3306
-    #   user: "video_user"
-    #   password: "password"
-    #   dbname: "video_db"

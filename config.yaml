@@ -1,0 +1,15 @@
+# Service Port
+port: "50051"
+
+# Log Level (debug, info, warn, error)
+log_level: "info"
+
+# Database Configuration (DSN) for Kubernetes service
+database:
+  dsn: "root:123456@tcp(mysql:3306)/newTik?charset=utf8mb4&parseTime=True&loc=Local"
+
+# Redis Configuration for Kubernetes service
+redis:
+  address: "redis:6379"
+  password: "" # no password set
+  db: 0 # default DB

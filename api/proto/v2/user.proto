@@ -1,0 +1,122 @@
+syntax="proto3";
+option go_package="newTiktoken/pkg/userpb/v2";
+package v2.user;
+
+//  =========================用户注册============================
+message UserRegisterRequest{
+  // @gotags: json:"username" binding:"required,max=32" validate:"required,max=32"
+  string username = 1;
+  // @gotags: json:"password" binding:"required,max=32" validate:"required,max=32"
+  string password = 2;
+}
+
+message UserRegisterResponse{
+  // @gotags: json:"status_code"
+  int32 status_code = 1;
+  // @gotags: json:"status_msg"
+  string status_msg = 2;
+  // @gotags: json:"user_id"
+  uint64 user_id = 3;
+}
+
+//  =========================用户登录============================
+message UserLoginRequest {
+  // @gotags: json:"username" binding:"required,max=32" validate:"required,max=32"
+  string username = 1;
+  // @gotags: json:"password" binding:"required,max=32" validate:"required,max=2"
+  string password = 2;
+  // @gotags: json:"deviceId" binding:"required,max=32" validate:"required,max=32"
+  string deviceId = 3;
+}
+message UserLoginResponse {
+  // @gotags: json:"status_code"
+  int32 status_code = 1;
+  // @gotags: json:"status_msg"
+  string status_msg = 2;
+  // @gotags: json:"user_id"
+  uint64 user_id = 3;
+  // @gotags: json:"refresh_token"
+  string refresh_token = 4;
+  // @gotags: json:"access_token"
+  string access_token = 5;
+}
+
+//  ==========================用户信息============================
+message User {
+  // @gotags: json:"id"
+  uint64 id = 1;
+  // @gotags: json:"name"
+  string name = 2;
+  // @gotags: json:"following_count"
+  uint64 following_count = 3;
+  // @gotags: json:"follower_count"
+  uint64 follower_count = 4;
+  // @gotags: json:"is_follow"
+  bool is_follow = 5;
+  // @gotags: json:"total_favorite"
+  uint64 total_favorite = 6;
+  // @gotags: json:"work_count"
+  uint64 work_count = 7;
+  // @gotags: json:"favorite_count"
+  uint64 favorite_count = 8;
+}
+
+message UserInfoRequest {
+  // @gotags: json:"user_id" form:"user_id" validate:"required" binding:"required"
+  uint64 query_user_id = 1;
+  // @gotags: json:"token_user_id" form:"token" binding:"required"
+  uint64 token_user_id = 2;
+}
+message UserInfoResponse {
+  // @gotags: json:"status_code"
+  int32 status_code = 1;
+  // @gotags: json:"status_msg"
+  string status_msg = 2;
+  User user = 3;
+}
+
+//  ==========================Token============================
+message AccessTokenRequest{
+  // @gotags: json:"user_id"
+  uint64 user_id = 1;
+  // @gotags: json:"refresh_token"
+  string refresh_token = 2;
+  // @gotags: json:"device_id"
+  string device_id = 3;
+}
+
+message AccessTokenResponse{
+  // @gotags: json:"status_code"
+  int32 status_code = 1;
+  // @gotags: json:"status_msg"
+  string status_msg = 2;
+  // @gotags: json:"access_token"
+  string access_token = 3;
+}
+
+service UserService{
+  rpc RefreshAccessToken(AccessTokenRequest) returns (AccessTokenResponse){
+    option (google.api.http) = {
+      post: "/v1/tokens/refresh"
+      body: "*"
+    };
+  }
+  rpc UserRegister(UserRegisterRequest) returns (UserRegisterResponse){
+    option (google.api.http) = {
+      post: "/v1/users/register"
+      body: "*"
+    };
+  }
+  rpc Login(UserLoginRequest) returns (UserLoginResponse){
+    option (google.api.http) = {
+      post: "/v1/users/login"
+      body: "*"
+    };
+  }
+  rpc UserInfo(UserInfoRequest) returns (UserInfoResponse){
+    option (google.api.http) = {
+      // 将 query_user_id 字段映射到 URL 路径中
+      get: "/v1/users/{query_user_id}"
+    };
+  }
+}

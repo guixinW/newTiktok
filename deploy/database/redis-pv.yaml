@@ -1,0 +1,29 @@
+# redis-pv.yaml
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: redis-pv
+  labels:
+    type: local
+spec:
+  storageClassName: manual
+  capacity:
+    storage: 1Gi # 定义存储空间大小
+  accessModes:
+    - ReadWriteOnce
+  # 这个路径必须和 kind 配置文件中 extraMounts.containerPath 一致
+  hostPath:
+    path: "/data/redis"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: redis-pvc
+spec:
+  storageClassName: manual
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      # 请求的存储大小必须小于或等于 PV 的容量
+      storage: 1Gi

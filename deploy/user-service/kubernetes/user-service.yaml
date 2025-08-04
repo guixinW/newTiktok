@@ -14,38 +14,43 @@ spec:
         app: user-service
     spec:
       containers:
-      - name: user-service
-        image: user-service:latest
-        # 'imagePullPolicy: Never' is important for kind.
-        # It tells Kubernetes to use the local image we load, not to pull from a remote registry.
-        imagePullPolicy: Never
-        ports:
-        - containerPort: 50051
-        env:
-          - name: CONFIG_PATH
-            value: "/app/config.yaml"
-        volumeMounts:
-        - name: config-volume
-          # Mount the config file into the app's working directory
-          mountPath: /app/config.yaml
-          subPath: config.yaml
+        - name: user-service
+          image: user-service:latest
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 50051
+              name: grpc # 为端口添加名称是一个好习惯
+          env:
+            - name: CONFIG_PATH
+              value: "/app/config.yaml"
+          volumeMounts:
+            - name: config-volume
+              mountPath: /app/config.yaml
+              subPath: config.yaml
       volumes:
-      - name: config-volume
-        configMap:
-          name: user-service-config
+        - name: config-volume
+          configMap:
+            name: user-service-config
 ---
-# Service to expose the user service deployment
+# Service to expose the user service deployment internally for Kong
 apiVersion: v1
 kind: Service
 metadata:
   name: user-service
+  annotations:
+    # MODIFICATION: Annotation moved here from the Deployment.
+    # This tells Kong to use the gRPC protocol when communicating with this Service.
+    konghq.com/protocol: grpc
 spec:
-  # NodePort makes the service accessible from the host machine.
-  type: NodePort
+  # MODIFICATION: Changed from NodePort to ClusterIP.
+  # The Service only needs to be accessible inside the cluster by Kong.
+  type: ClusterIP
   selector:
     app: user-service
   ports:
-  - protocol: TCP
-    port: 50051       # Port inside the cluster
-    targetPort: 50051  # Port on the pod
-    # nodePort: 30051    # Optional: specify a fixed port to access from the host
+    - name: grpc # 端口名称与容器端口的名称匹配
+      protocol: TCP
+      # RECOMMENDED: Explicitly declare the application protocol.
+      appProtocol: grpc
+      port: 50051
+      targetPort: 50051

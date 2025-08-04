@@ -1,4 +1,3 @@
-# Headless Service for the Redis StatefulSet
 apiVersion: v1
 kind: Service
 metadata:
@@ -8,7 +7,6 @@ spec:
     - port: 6379
   selector:
     app: redis
-  # A headless service is required for the StatefulSet.
   clusterIP: None
 ---
 # StatefulSet for the Redis server
@@ -30,20 +28,18 @@ spec:
       containers:
         - name: redis
           image: redis:7-alpine
-          # Use a command to start Redis with append-only file persistence enabled.
           command: ["redis-server", "--appendonly", "yes"]
           ports:
             - containerPort: 6379
           volumeMounts:
             - name: redis-persistent-storage
-              # Mount the persistent volume at the location where Redis stores its data.
               mountPath: /data
-  # volumeClaimTemplates create a dedicated PVC for each Redis pod.
-  volumeClaimTemplates:
-    - metadata:
-        name: redis-persistent-storage
-      spec:
-        accessModes: [ "ReadWriteOnce" ]
-        resources:
-          requests:
-            storage: 256Mi
+      # ===================== 关键改动在这里 =====================
+      # 1. 移除了原来的 volumeClaimTemplates 部分
+      # 2. 添加了下面的 volumes 部分
+      volumes:
+        - name: redis-persistent-storage
+          persistentVolumeClaim:
+            # 明确指定使用我们刚刚创建的名为 redis-pvc 的 PVC
+            claimName: redis-pvc
+      # =========================================================

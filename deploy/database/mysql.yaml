@@ -1,6 +1,6 @@
-# Headless Service for the MySQL StatefulSet
-# A StatefulSet requires a "headless" service to control the network domain of its pods.
-# This allows each pod to get a unique, stable DNS name (e.g., mysql-0.mysql).
+# mysql-statefulset.yaml
+
+# Headless Service (无需改动)
 apiVersion: v1
 kind: Service
 metadata:
@@ -10,17 +10,14 @@ spec:
     - port: 3306
   selector:
     app: mysql
-  # By setting clusterIP to None, we make this a headless service.
   clusterIP: None
 ---
 # StatefulSet for the MySQL server
-# This replaces the previous Deployment and separate PersistentVolumeClaim.
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: mysql
 spec:
-  # The serviceName must match the name of the headless service defined above.
   serviceName: "mysql"
   replicas: 1
   selector:
@@ -42,17 +39,15 @@ spec:
             - name: MYSQL_DATABASE
               value: "newTik"
           volumeMounts:
-            # This name must match the name of the volumeClaimTemplate below.
+            # 这个名字必须和下面 volumes 定义的 name 一致
             - name: mysql-persistent-storage
               mountPath: /var/lib/mysql
-  # volumeClaimTemplates dynamically create a PersistentVolumeClaim for each pod.
-  # This ensures each MySQL pod gets its own stable, persistent storage.
-  # This replaces the need for a separate PVC resource.
-  volumeClaimTemplates:
-    - metadata:
-        name: mysql-persistent-storage
-      spec:
-        accessModes: [ "ReadWriteOnce" ]
-        resources:
-          requests:
-            storage: 1Gi
+      # ===================== 关键改动在这里 =====================
+      # 1. 移除了原来的 volumeClaimTemplates 部分
+      # 2. 添加了下面的 volumes 部分
+      volumes:
+        - name: mysql-persistent-storage
+          persistentVolumeClaim:
+            # 明确指定使用我们之前创建的名为 mysql-pvc 的 PVC
+            claimName: mysql-pvc
+      # =========================================================
