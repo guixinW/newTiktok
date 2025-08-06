@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 	"newTiktoken/internal/user/domain/model"
+	"newTiktoken/internal/user/domain/password"
 	"newTiktoken/internal/user/domain/repository"
 )
 
@@ -26,7 +27,7 @@ func NewUserService(userRepo repository.UserRepository, logger *slog.Logger) *Us
 }
 
 // RegisterUser 处理用户注册的逻辑
-func (s *UserService) RegisterUser(ctx context.Context, username, password string) (*model.User, error) {
+func (s *UserService) RegisterUser(ctx context.Context, username, plainPassword string) (*model.User, error) {
 	// 1. 检查用户是否已存在
 	existingUser, err := s.userRepo.FindByUsername(ctx, username)
 	if err != nil {
@@ -38,16 +39,15 @@ func (s *UserService) RegisterUser(ctx context.Context, username, password strin
 		return nil, ErrUserAlreadyExists
 	}
 
-	// 2. 对密码进行哈希处理 (实际应用中必须使用 bcrypt)
-	// hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
-	// if err != nil {
-	// 	 s.logger.Error("failed to hash password", "error", err)
-	// 	 return nil, err
-	// }
-	hashedPassword := password // 仅为示例
+	// 2. 使用 Argon2 对密码进行哈希处理
+	hashedPassword, err := password.Hash(plainPassword)
+	if err != nil {
+		s.logger.Error("failed to hash password", "error", err)
+		return nil, err
+	}
 
 	// 3. 创建新的用户领域模型
-	newUser := model.NewUser(username, string(hashedPassword))
+	newUser := model.NewUser(username, hashedPassword)
 	s.logger.Debug("creating new user object", "username", username)
 
 	// 4. 保存用户到仓库
