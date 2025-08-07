@@ -7,17 +7,51 @@ on:
 
 jobs:
   build-and-deploy:
-    # This job runs on your local machine because cloud runners can't access a local Kind cluster
     runs-on: self-hosted
+    outputs:
+      gateway_changed: ${{ steps.changes.outputs.gateway }}
+      user_service_changed: ${{ steps.changes.outputs.user_service }}
+      video_service_changed: ${{ steps.changes.outputs.video_service }}
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
+
+      - name: Find changed files
+        id: changes
+        uses: tj-actions/changed-files@v44
+        with:
+          files_yaml: |
+            gateway:
+              - cmd/gateway/**
+              - internal/gateway/**
+              - deploy/gateway/**
+              - api/**
+              - go.mod
+              - go.sum
+              - pkg/**
+            user_service:
+              - cmd/user_service/**
+              - internal/user/**
+              - deploy/user-service/**
+              - api/proto/v1/user.proto
+              - api/proto/v2/user.proto
+              - go.mod
+              - go.sum
+              - pkg/**
+            video_service:
+              - cmd/video_service/**
+              - internal/video/**
+              - deploy/video-service/**
+              - api/proto/v1/video.proto
+              - go.mod
+              - go.sum
+              - pkg/**
 
       - name: Set up Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v5
         with:
-          go-version: '1.23.0' # Specify your Go version
+          go-version: '1.23.0'
 
       - name: Run Go Tests
         run: go test -v ./...
@@ -29,33 +63,49 @@ jobs:
         run: $(go env GOPATH)/bin/golangci-lint run ./...
 
       - name: Build Gateway Docker Image
+        if: steps.changes.outputs.gateway == 'true'
         run: |
-          docker build -t gateway:latest -f deploy/gateway/Dockerfile .
+          docker build -t gateway:latest \
+            --build-arg HTTP_PROXY=http://host.docker.internal:7897 \
+            --build-arg HTTPS_PROXY=http://host.docker.internal:7897 \
+            -f deploy/gateway/Dockerfile .
 
       - name: Build User Service Docker Image
+        if: steps.changes.outputs.user_service == 'true'
         run: |
-          docker build -t user-service:latest -f deploy/user-service/Dockerfile .
-      
+          docker build -t user-service:latest \
+            --build-arg HTTP_PROXY=http://host.docker.internal:7897 \
+            --build-arg HTTPS_PROXY=http://host.docker.internal:7897 \
+            -f deploy/user-service/Dockerfile .
+
       - name: Build Video Service Docker Image
+        if: steps.changes.outputs.video_service == 'true'
         run: |
-          docker build -t video-service:latest -f deploy/video-service/Dockerfile .
+          docker build -t video-service:latest \
+            --build-arg HTTP_PROXY=http://host.docker.internal:7897 \
+            --build-arg HTTPS_PROXY=http://host.docker.internal:7897 \
+            -f deploy/video-service/Dockerfile .
 
       - name: Load Gateway Image into Kind
-        run: |
-          kind load docker-image gateway:latest
+        if: steps.changes.outputs.gateway == 'true'
+        run: kind load docker-image gateway:latest
 
       - name: Load User Service Image into Kind
-        run: |
-          kind load docker-image user-service:latest
-          
-      - name: Load Video Service Image into Kind
-        run: |
-          kind load docker-image video-service:latest
+        if: steps.changes.outputs.user_service == 'true'
+        run: kind load docker-image user-service:latest
 
-      - name: Deploy to Kind
-        run: |
-          kubectl apply -f deploy/database/mysql.yaml
-          kubectl apply -f deploy/database/redis.yaml
-          kubectl apply -f deploy/gateway/kubernetes/gateway.yaml
-          kubectl apply -f deploy/user-service/kubernetes/user-service.yaml
-          kubectl apply -f deploy/video-service/kubernetes/video-service.yaml
+      - name: Load Video Service Image into Kind
+        if: steps.changes.outputs.video_service == 'true'
+        run: kind load docker-image video-service:latest
+
+      - name: Deploy Gateway
+        if: steps.changes.outputs.gateway == 'true'
+        run: kubectl apply -f deploy/gateway/kubernetes/gateway.yaml
+
+      - name: Deploy User Service
+        if: steps.changes.outputs.user_service == 'true'
+        run: kubectl apply -f deploy/user-service/kubernetes/user-service.yaml
+
+      - name: Deploy Video Service
+        if: steps.changes.outputs.video_service == 'true'
+        run: kubectl apply -f deploy/video-service/kubernetes/video-service.yaml
