@@ -1,42 +1,47 @@
+# Dockerfile for gateway service
+# IMPORTANT: This file is designed to be run from the project root directory.
+# Example command: docker build -f deploy/gateway/Dockerfile .
+
 # Stage 1: Builder
-# This stage builds the Go application into a static binary.
 FROM golang:1.23-alpine AS builder
 
-# Set the working directory inside the container
 WORKDIR /app
 
-# Accept proxy settings as build arguments
 ARG HTTP_PROXY
 ARG HTTPS_PROXY
 
-# Copy go.mod and go.sum files to download dependencies first
+# 1. Copy dependency files (path is relative to build context, i.e., project root)
 COPY go.mod go.sum ./
 
-# Use the proxy arguments when running go mod download
+# 2. Download dependencies
 RUN export http_proxy=${HTTP_PROXY} && \
     export https_proxy=${HTTPS_PROXY} && \
     go mod download
 
-# Copy the entire source code
-COPY ../../ .
+# 3. Copy only necessary source code for the gateway service
+# This replaces the inefficient "COPY ../../ ."
+COPY cmd/gateway/ ./cmd/gateway/
+# The following line assumes the gateway has its own internal logic. If not, remove it.
+COPY internal/gateway/ ./internal/gateway/
+# The gateway typically needs all shared packages and protobuf definitions.
+COPY pkg/ ./pkg/
 
-# Build the application, creating a statically linked binary.
-# Ensure the proxy is also available for the build step if needed.
+# 4. Build the gateway application
 RUN export http_proxy=${HTTP_PROXY} && \
     export https_proxy=${HTTPS_PROXY} && \
     CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o /app/gateway ./cmd/gateway/main.go
 
+
 # Stage 2: Final
-# This stage creates the final, small, and secure image.
+# This stage is already well-optimized. No changes needed.
 FROM alpine:latest
 
-# Set the working directory
 WORKDIR /app
 
 # Copy the built binary from the builder stage
 COPY --from=builder /app/gateway .
 
-# Expose the port the HTTP server listens on
+# Expose the port the HTTP gateway listens on
 EXPOSE 8081
 
 # The command to run the application

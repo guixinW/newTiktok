@@ -1,41 +1,44 @@
+# Dockerfile for video-service
+# IMPORTANT: This file is designed to be run from the project root directory.
+# Example command: docker build -f deploy/video-service/Dockerfile .
+
 # Stage 1: Builder
-# This stage builds the Go application into a static binary.
 FROM golang:1.23-alpine AS builder
 
-# Set the working directory inside the container
 WORKDIR /app
 
-# Accept proxy settings as build arguments
 ARG HTTP_PROXY
 ARG HTTPS_PROXY
 
-# Copy go.mod and go.sum files to download dependencies first
+# 1. Copy dependency files for caching
 COPY go.mod go.sum ./
 
-# Use the proxy arguments when running go mod download
+# 2. Download dependencies
 RUN export http_proxy=${HTTP_PROXY} && \
     export https_proxy=${HTTPS_PROXY} && \
     go mod download
 
-# Copy the entire source code
-COPY . .
+# 3. Copy only necessary source code for video_service
+# This is the key optimization to isolate build caches between services.
+COPY cmd/video_service/ ./cmd/video_service/
+COPY internal/video/ ./internal/video/
+COPY pkg/ ./pkg/
 
-# Build the video service application, creating a statically linked binary.
+# 4. Build the video_service application
 RUN export http_proxy=${HTTP_PROXY} && \
     export https_proxy=${HTTPS_PROXY} && \
     CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o /app/video_service ./cmd/video_service/main.go
 
+
 # Stage 2: Final
-# This stage creates the final, small, and secure image.
 FROM alpine:latest
 
-# Set the working directory
 WORKDIR /app
 
 # Copy the built binary from the builder stage
 COPY --from=builder /app/video_service .
 
-# Expose the port the gRPC server listens on (50052 for video service)
+# Expose the port for the video service gRPC server
 EXPOSE 50052
 
 # The command to run the application

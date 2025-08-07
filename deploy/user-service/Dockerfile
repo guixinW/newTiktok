@@ -1,43 +1,59 @@
 # Stage 1: Builder
-# This stage builds the Go application into a static binary.
+# 此阶段负责编译 Go 应用，生成一个静态链接的二进制文件。
 FROM golang:1.23-alpine AS builder
 
-# Set the working directory inside the container
+# 容器内的工作目录
 WORKDIR /app
 
-# Accept proxy settings as build arguments
+# 接收代理设置作为构建参数，以便在需要时使用
 ARG HTTP_PROXY
 ARG HTTPS_PROXY
 
-# Copy go.mod and go.sum files to download dependencies first
+# --- 缓存优化步骤 ---
+
+# 1. 仅复制依赖管理文件
+# 这是第一层，只有在 go.mod 或 go.sum 文件发生变化时，这一层以及之后的缓存才会失效。
 COPY go.mod go.sum ./
 
-# Use the proxy arguments when running go mod download
+# 2. 下载依赖
+# 利用上一步的缓存，只有在依赖变更时才需要重新下载。
 RUN export http_proxy=${HTTP_PROXY} && \
     export https_proxy=${HTTPS_PROXY} && \
     go mod download
 
-# Copy the entire source code
-COPY . .
+# 3. 精细化地复制构建所需的源代码
+# 这是最关键的优化：只复制当前服务（user_service）真正依赖的目录。
+# 这样，当其他服务（如 internal/video/）的代码变更时，不会影响本服务的构建缓存。
+COPY cmd/user_service/ ./cmd/user_service/
+COPY internal/user/ ./internal/user
+COPY pkg/ ./pkg
 
-# Build the application, creating a statically linked binary.
-# Ensure the proxy is also available for the build step if needed.
+# 4. 编译应用
+# CGO_ENABLED=0 创建一个静态链接的二进制文件，不依赖任何系统的 C 库。
+# GOOS=linux 指定目标操作系统为 Linux。
+# -a 强制重新构建。
+# -installsuffix cgo 避免使用标准库的缓存。
 RUN export http_proxy=${HTTP_PROXY} && \
     export https_proxy=${HTTPS_PROXY} && \
     CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o /app/user_service ./cmd/user_service/main.go
 
-# Stage 2: Final
-# This stage creates the final, small, and secure image.
-FROM alpine:latest
 
-# Set the working directory
+# Stage 2: Final
+# 此阶段负责构建最终的运行镜像，它非常小且安全。
+FROM alpine:latest
+# 建议：为了生产环境的稳定性，可以固定版本，如 FROM alpine:3.20
+
+# 最终镜像的工作目录
 WORKDIR /app
 
-# Copy the built binary from the builder stage
+# 注意：应用的配置（如数据库地址、密码等）应通过环境变量或挂载的配置文件来管理，
+# 而不是直接打包进镜像。你的代码 `config.LoadConfig()` 需要适配这种方式。
+
+# 从 builder 阶段仅复制编译好的二进制文件
 COPY --from=builder /app/user_service .
 
-# Expose the port the gRPC server listens on
+# 暴露 gRPC 服务监听的端口
 EXPOSE 50051
 
-# The command to run the application
+# 容器启动时运行的命令
 CMD ["/app/user_service"]
