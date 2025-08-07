@@ -1,0 +1,61 @@
+name: Go CI/CD to Kind
+
+on:
+  push:
+    branches:
+      - main # Triggers the workflow on push to the main branch
+
+jobs:
+  build-and-deploy:
+    # This job runs on your local machine because cloud runners can't access a local Kind cluster
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: '1.20' # Specify your Go version
+
+      - name: Run Go Tests
+        run: go test -v ./...
+
+      - name: Install golangci-lint
+        run: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+
+      - name: Run Go Linter
+        run: $(go env GOPATH)/bin/golangci-lint run ./...
+
+      - name: Build Gateway Docker Image
+        run: |
+          docker build -t gateway:latest -f deploy/gateway/Dockerfile .
+
+      - name: Build User Service Docker Image
+        run: |
+          docker build -t user-service:latest -f deploy/user-service/Dockerfile .
+      
+      - name: Build Video Service Docker Image
+        run: |
+          docker build -t video-service:latest -f deploy/video-service/Dockerfile .
+
+      - name: Load Gateway Image into Kind
+        run: |
+          kind load docker-image gateway:latest
+
+      - name: Load User Service Image into Kind
+        run: |
+          kind load docker-image user-service:latest
+          
+      - name: Load Video Service Image into Kind
+        run: |
+          kind load docker-image video-service:latest
+
+      - name: Deploy to Kind
+        run: |
+          kubectl apply -f deploy/database/mysql.yaml
+          kubectl apply -f deploy/database/redis.yaml
+          kubectl apply -f deploy/gateway/kubernetes/gateway.yaml
+          kubectl apply -f deploy/user-service/kubernetes/user-service.yaml
+          kubectl apply -f deploy/video-service/kubernetes/video-service.yaml
