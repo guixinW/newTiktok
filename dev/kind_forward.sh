@@ -21,6 +21,7 @@ SERVICES=(
   "redis default 6379:6379"
   "user-service default 50051:50051"
   "video-service default 50052:50052"
+  "gateway-service default 8081:8081"
 )
 
 # 用于存储后台进程ID (PID) 的文件
