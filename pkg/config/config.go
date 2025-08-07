@@ -35,7 +35,8 @@ type Gateway struct {
 
 // UserService holds user service configuration.
 type UserService struct {
-	Port string `mapstructure:"port"`
+	Port        string `mapstructure:"port"`
+	ServiceName string `mapstructure:"service_name"`
 }
 
 // LoadConfig reads configuration from file or environment variables.

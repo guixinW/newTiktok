@@ -29,7 +29,7 @@ func main() {
 	appLogger.Info("starting API gateway...")
 
 	userConn, err := grpc.NewClient(
-		fmt.Sprintf("localhost:%s", cfg.UserService.Port),
+		fmt.Sprintf("%s:%s", cfg.UserService.ServiceName, cfg.UserService.Port),
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	)
 	if err != nil {
