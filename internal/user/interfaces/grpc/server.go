@@ -13,8 +13,8 @@ import (
 // Server 是 gRPC 服务器，它实现了 userpb.UserServiceServer 接口
 type Server struct {
 	pb.UnimplementedUserServiceServer // 必须嵌入，以保证向前兼容
-	app    *application.UserService
-	logger *slog.Logger
+	app                               *application.UserService
+	logger                            *slog.Logger
 }
 
 // NewUserServer 创建一个新的 gRPC 用户服务服务器
@@ -42,6 +42,24 @@ func (s *Server) LogInterceptor(ctx context.Context, req interface{}, info *grpc
 	}
 
 	return resp, err
+}
+
+// Login 实现了登陆的gRPC方法
+func (s *Server) Login(ctx context.Context, req *pb.UserLoginRequest) (*pb.UserLoginResponse, error) {
+	user, err := s.app.Login(ctx, req.GetUsername(), req.GetPassword())
+	if err != nil {
+		s.logger.Warn("user login failed", "username", req.GetUsername(), "error", err)
+		return &pb.UserLoginResponse{
+			StatusCode: 500,
+			StatusMsg:  err.Error(),
+		}, nil
+	}
+	s.logger.Info("user login successfully", "user_id", user.ID)
+	return &pb.UserLoginResponse{
+		StatusCode: 0,
+		StatusMsg:  "success",
+		UserId:     user.ID,
+	}, nil
 }
 
 // UserRegister 实现了注册的 gRPC 方法

@@ -1,6 +1,7 @@
 package model
 
 import (
+	"newTiktoken/internal/user/domain/password"
 	"time"
 )
 
@@ -29,9 +30,10 @@ func NewUser(username, hashedPassword string) *User {
 }
 
 // CheckPassword 验证密码是否正确 (伪代码，实际应使用 bcrypt)
-func (u *User) CheckPassword(password string) bool {
-	// 在实际应用中，这里应该使用 bcrypt.CompareHashAndPassword
-	// 为了简化，我们这里只做简单比较
-	// return bcrypt.CompareHashAndPassword([]byte(u.HashedPassword), []byte(password)) == nil
-	return u.HashedPassword == password // 仅为示例
+func (u *User) CheckPassword(plainPassword string) (bool, error) {
+	hashedPassword, err := password.Hash(plainPassword)
+	if err != nil {
+		return false, err
+	}
+	return u.HashedPassword == hashedPassword, nil
 }

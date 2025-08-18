@@ -10,7 +10,11 @@ import (
 )
 
 // ErrUserAlreadyExists 是一个标准错误，表示用户已存在
-var ErrUserAlreadyExists = errors.New("user already exists")
+var (
+	ErrUserAlreadyExists = errors.New("user already exists")
+	ErrUserNotFound      = errors.New("user not found")
+	ErrPasswordNotMatch  = errors.New("password does not match")
+)
 
 // UserService 提供了用户相关的应用服务
 type UserService struct {
@@ -58,6 +62,24 @@ func (s *UserService) RegisterUser(ctx context.Context, username, plainPassword 
 
 	s.logger.Info("user created successfully", "user_id", newUser.ID, "username", username)
 	return newUser, nil
+}
+
+func (s *UserService) Login(ctx context.Context, username string, plainPassword string) (*model.User, error) {
+	user, err := s.userRepo.FindByUsername(ctx, username)
+	if err != nil {
+		s.logger.Error("failed to find user", "username", username, "error", err)
+		return nil, ErrUserNotFound
+	}
+	ok, err := user.CheckPassword(plainPassword)
+	if err != nil {
+		s.logger.Error("hashed password err", "username", username, "error", err)
+		return nil, ErrPasswordNotMatch
+	}
+	if !ok {
+		s.logger.Warn("password incorrect", "username", username)
+		return nil, ErrPasswordNotMatch
+	}
+	return user, nil
 }
 
 // GetUserInfo 处理获取用户信息的逻辑
