@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.2.0
 // - protoc             v5.29.1
-// source: api/proto/v1/user.proto
+// source: user.proto
 
 package userpb
 
@@ -22,7 +22,6 @@ const _ = grpc.SupportPackageIsVersion7
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type UserServiceClient interface {
-	RefreshAccessToken(ctx context.Context, in *AccessTokenRequest, opts ...grpc.CallOption) (*AccessTokenResponse, error)
 	UserRegister(ctx context.Context, in *UserRegisterRequest, opts ...grpc.CallOption) (*UserRegisterResponse, error)
 	Login(ctx context.Context, in *UserLoginRequest, opts ...grpc.CallOption) (*UserLoginResponse, error)
 	UserInfo(ctx context.Context, in *UserInfoRequest, opts ...grpc.CallOption) (*UserInfoResponse, error)
@@ -34,15 +33,6 @@ type userServiceClient struct {
 
 func NewUserServiceClient(cc grpc.ClientConnInterface) UserServiceClient {
 	return &userServiceClient{cc}
-}
-
-func (c *userServiceClient) RefreshAccessToken(ctx context.Context, in *AccessTokenRequest, opts ...grpc.CallOption) (*AccessTokenResponse, error) {
-	out := new(AccessTokenResponse)
-	err := c.cc.Invoke(ctx, "/user.UserService/RefreshAccessToken", in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
 }
 
 func (c *userServiceClient) UserRegister(ctx context.Context, in *UserRegisterRequest, opts ...grpc.CallOption) (*UserRegisterResponse, error) {
@@ -76,7 +66,6 @@ func (c *userServiceClient) UserInfo(ctx context.Context, in *UserInfoRequest, o
 // All implementations must embed UnimplementedUserServiceServer
 // for forward compatibility
 type UserServiceServer interface {
-	RefreshAccessToken(context.Context, *AccessTokenRequest) (*AccessTokenResponse, error)
 	UserRegister(context.Context, *UserRegisterRequest) (*UserRegisterResponse, error)
 	Login(context.Context, *UserLoginRequest) (*UserLoginResponse, error)
 	UserInfo(context.Context, *UserInfoRequest) (*UserInfoResponse, error)
@@ -87,9 +76,6 @@ type UserServiceServer interface {
 type UnimplementedUserServiceServer struct {
 }
 
-func (UnimplementedUserServiceServer) RefreshAccessToken(context.Context, *AccessTokenRequest) (*AccessTokenResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method RefreshAccessToken not implemented")
-}
 func (UnimplementedUserServiceServer) UserRegister(context.Context, *UserRegisterRequest) (*UserRegisterResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UserRegister not implemented")
 }
@@ -110,24 +96,6 @@ type UnsafeUserServiceServer interface {
 
 func RegisterUserServiceServer(s grpc.ServiceRegistrar, srv UserServiceServer) {
 	s.RegisterService(&UserService_ServiceDesc, srv)
-}
-
-func _UserService_RefreshAccessToken_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(AccessTokenRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(UserServiceServer).RefreshAccessToken(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/user.UserService/RefreshAccessToken",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(UserServiceServer).RefreshAccessToken(ctx, req.(*AccessTokenRequest))
-	}
-	return interceptor(ctx, in, info, handler)
 }
 
 func _UserService_UserRegister_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -192,10 +160,6 @@ var UserService_ServiceDesc = grpc.ServiceDesc{
 	HandlerType: (*UserServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "RefreshAccessToken",
-			Handler:    _UserService_RefreshAccessToken_Handler,
-		},
-		{
 			MethodName: "UserRegister",
 			Handler:    _UserService_UserRegister_Handler,
 		},
@@ -209,5 +173,5 @@ var UserService_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "api/proto/v1/user.proto",
+	Metadata: "user.proto",
 }
