@@ -3,15 +3,42 @@ name: Go CI/CD to Kind
 on:
   push:
     branches:
-      - master # Triggers the workflow on push to the master branch
+      - master
+    paths:
+      - 'cmd/**'
+      - 'internal/**'
+      - 'deploy/**'
+      - 'api/**'
+      - 'pkg/**'
+      - 'go.mod'
+      - 'go.sum'
 
 jobs:
+  # --- Job 1: 持续集成 (CI) - 负责代码质量检查 ---
+  ci-check:
+    runs-on: self-hosted
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23.0'
+
+      - name: Run Go Tests
+        run: go test -v ./...
+
+      - name: Install and Run Go Linter
+        run: |
+          go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+          $(go env GOPATH)/bin/golangci-lint run ./...
+
+  # --- Job 2: 持续部署 (CD) - 负责构建和部署 ---
   build-and-deploy:
     runs-on: self-hosted
-    outputs:
-      gateway_changed: ${{ steps.changes.outputs.gateway }}
-      user_service_changed: ${{ steps.changes.outputs.user_service }}
-      video_service_changed: ${{ steps.changes.outputs.video_service }}
+    # 依赖于 ci-check job，确保代码检查通过后才进行部署
+    needs: ci-check
 
     steps:
       - name: Checkout code
@@ -48,64 +75,52 @@ jobs:
               - go.sum
               - pkg/**
 
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: '1.23.0'
+      # --- 分别构建、加载和部署已变更的服务 ---
 
-      - name: Run Go Tests
-        run: go test -v ./...
-
-      - name: Install golangci-lint
-        run: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
-
-      - name: Run Go Linter
-        run: $(go env GOPATH)/bin/golangci-lint run ./...
-
-      - name: Build Gateway Docker Image
+      - name: Build and Load Gateway
         if: steps.changes.outputs.gateway == 'true'
         run: |
+          echo "Building Gateway image..."
           docker build -t gateway:latest \
             --build-arg HTTP_PROXY=http://host.docker.internal:7897 \
             --build-arg HTTPS_PROXY=http://host.docker.internal:7897 \
             -f deploy/gateway/Dockerfile .
+          echo "Loading Gateway image into Kind..."
+          kind load docker-image gateway:latest
 
-      - name: Build User Service Docker Image
+      - name: Build and Load User Service
         if: steps.changes.outputs.user_service == 'true'
         run: |
+          echo "Building User Service image..."
           docker build -t user-service:latest \
             --build-arg HTTP_PROXY=http://host.docker.internal:7897 \
             --build-arg HTTPS_PROXY=http://host.docker.internal:7897 \
             -f deploy/user-service/Dockerfile .
+          echo "Loading User Service image into Kind..."
+          kind load docker-image user-service:latest
 
-      - name: Build Video Service Docker Image
+      - name: Build and Load Video Service
         if: steps.changes.outputs.video_service == 'true'
         run: |
+          echo "Building Video Service image..."
           docker build -t video-service:latest \
             --build-arg HTTP_PROXY=http://host.docker.internal:7897 \
             --build-arg HTTPS_PROXY=http://host.docker.internal:7897 \
             -f deploy/video-service/Dockerfile .
+          echo "Loading Video Service image into Kind..."
+          kind load docker-image video-service:latest
 
-      - name: Load Gateway Image into Kind
-        if: steps.changes.outputs.gateway == 'true'
-        run: kind load docker-image gateway:latest
-
-      - name: Load User Service Image into Kind
-        if: steps.changes.outputs.user_service == 'true'
-        run: kind load docker-image user-service:latest
-
-      - name: Load Video Service Image into Kind
-        if: steps.changes.outputs.video_service == 'true'
-        run: kind load docker-image video-service:latest
-
-      - name: Deploy Gateway
-        if: steps.changes.outputs.gateway == 'true'
-        run: kubectl apply -f deploy/gateway/kubernetes/gateway.yaml
-
-      - name: Deploy User Service
-        if: steps.changes.outputs.user_service == 'true'
-        run: kubectl apply -f deploy/user-service/kubernetes/user-service.yaml
-
-      - name: Deploy Video Service
-        if: steps.changes.outputs.video_service == 'true'
-        run: kubectl apply -f deploy/video-service/kubernetes/video-service.yaml
+      - name: Deploy services to Kubernetes
+        run: |
+          if [[ "${{ steps.changes.outputs.gateway }}" == "true" ]]; then
+            echo "Deploying Gateway..."
+            kubectl apply -f deploy/gateway/kubernetes/gateway.yaml
+          fi
+          if [[ "${{ steps.changes.outputs.user_service }}" == "true" ]]; then
+            echo "Deploying User Service..."
+            kubectl apply -f deploy/user-service/kubernetes/user-service.yaml
+          fi
+          if [[ "${{ steps.changes.outputs.video_service }}" == "true" ]]; then
+            echo "Deploying Video Service..."
+            kubectl apply -f deploy/video-service/kubernetes/video-service.yaml
+          fi
