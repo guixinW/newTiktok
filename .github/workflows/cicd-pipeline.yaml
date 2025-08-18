@@ -43,11 +43,16 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        # 关键改动 1: 拉取完整历史，为 changed-files 提供比较的上下文
+        with:
+          fetch-depth: 0
 
       - name: Find changed files
         id: changes
         uses: tj-actions/changed-files@v44
         with:
+          # 关键改动 2: 明确告知 action 在本次 push 的范围内进行比较
+          since_last_remote_commit: true
           files_yaml: |
             gateway:
               - cmd/gateway/**
