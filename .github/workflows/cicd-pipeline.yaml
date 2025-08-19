@@ -12,6 +12,8 @@ on:
       - 'pkg/**'
       - 'go.mod'
       - 'go.sum'
+      # [关键修改 1] 添加 workflow 文件本身到触发路径
+      - '.github/workflows/cicd-pipeline.yaml'
 
 jobs:
   # --- Job 1: 持续集成 (CI) - 负责代码质量检查 ---
@@ -20,6 +22,9 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          clean: true
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -37,21 +42,20 @@ jobs:
   # --- Job 2: 持续部署 (CD) - 负责构建和部署 ---
   build-and-deploy:
     runs-on: self-hosted
-    # 依赖于 ci-check job，确保代码检查通过后才进行部署
     needs: ci-check
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        # 关键改动 1: 拉取完整历史，为 changed-files 提供比较的上下文
         with:
           fetch-depth: 0
+          clean: true
 
       - name: Find changed files
         id: changes
         uses: tj-actions/changed-files@v44
         with:
-          # 关键改动 2: 明确告知 action 在本次 push 的范围内进行比较
+          # 我们需要获取所有变更文件的列表，所以这里的 path 保持默认即可
           since_last_remote_commit: true
           files_yaml: |
             gateway:
@@ -80,12 +84,26 @@ jobs:
               - go.sum
               - pkg/**
 
+      - name: Debug changed files output
+        run: |
+          echo "--- Verifying changed-files action outputs ---"
+          echo "Gateway changed: ${{ steps.changes.outputs.gateway }}"
+          echo "User Service changed: ${{ steps.changes.outputs.user_service }}"
+          echo "Video Service changed: ${{ steps.changes.outputs.video_service }}"
+          echo "--------------------------------------------------"
+          echo "All changed files detected by the action:"
+          echo "${{ steps.changes.outputs.all_changed_files }}"
+          echo "--------------------------------------------------"
+          echo "Manually verifying git diff on runner:"
+          git diff --name-only ${{ github.event.before }} ${{ github.sha }}
+
       # --- 分别构建、加载和部署已变更的服务 ---
 
       - name: Build and Load Gateway
-        if: steps.changes.outputs.gateway == 'true'
+        # [关键修改 2] 增加对 workflow 文件变更的判断
+        if: steps.changes.outputs.gateway == 'true' || contains(steps.changes.outputs.all_changed_files, '.github/workflows/cicd-pipeline.yaml')
         run: |
-          echo "Building Gateway image..."
+          echo "Building Gateway image (Triggered by service code or workflow change)..."
           docker build -t gateway:latest \
             --build-arg HTTP_PROXY=http://host.docker.internal:7897 \
             --build-arg HTTPS_PROXY=http://host.docker.internal:7897 \
@@ -94,9 +112,10 @@ jobs:
           kind load docker-image gateway:latest
 
       - name: Build and Load User Service
-        if: steps.changes.outputs.user_service == 'true'
+        # [关键修改 2] 增加对 workflow 文件变更的判断
+        if: steps.changes.outputs.user_service == 'true' || contains(steps.changes.outputs.all_changed_files, '.github/workflows/cicd-pipeline.yaml')
         run: |
-          echo "Building User Service image..."
+          echo "Building User Service image (Triggered by service code or workflow change)..."
           docker build -t user-service:latest \
             --build-arg HTTP_PROXY=http://host.docker.internal:7897 \
             --build-arg HTTPS_PROXY=http://host.docker.internal:7897 \
@@ -105,9 +124,10 @@ jobs:
           kind load docker-image user-service:latest
 
       - name: Build and Load Video Service
-        if: steps.changes.outputs.video_service == 'true'
+        # [关键修改 2] 增加对 workflow 文件变更的判断
+        if: steps.changes.outputs.video_service == 'true' || contains(steps.changes.outputs.all_changed_files, '.github/workflows/cicd-pipeline.yaml')
         run: |
-          echo "Building Video Service image..."
+          echo "Building Video Service image (Triggered by service code or workflow change)..."
           docker build -t video-service:latest \
             --build-arg HTTP_PROXY=http://host.docker.internal:7897 \
             --build-arg HTTPS_PROXY=http://host.docker.internal:7897 \
@@ -116,16 +136,27 @@ jobs:
           kind load docker-image video-service:latest
 
       - name: Deploy services to Kubernetes
+        # [关键修改 2] 增加对 workflow 文件变更的判断
+        if: steps.changes.outputs.gateway == 'true' || steps.changes.outputs.user_service == 'true' || steps.changes.outputs.video_service == 'true' || contains(steps.changes.outputs.all_changed_files, '.github/workflows/cicd-pipeline.yaml')
         run: |
-          if [[ "${{ steps.changes.outputs.gateway }}" == "true" ]]; then
-            echo "Deploying Gateway..."
+          # 如果工作流文件被修改，则强制部署所有服务
+          if [[ "${{ contains(steps.changes.outputs.all_changed_files, '.github/workflows/cicd-pipeline.yaml') }}" == "true" ]]; then
+            echo "Workflow file changed, deploying all services..."
             kubectl apply -f deploy/gateway/kubernetes/gateway.yaml
-          fi
-          if [[ "${{ steps.changes.outputs.user_service }}" == "true" ]]; then
-            echo "Deploying User Service..."
             kubectl apply -f deploy/user-service/kubernetes/user-service.yaml
-          fi
-          if [[ "${{ steps.changes.outputs.video_service }}" == "true" ]]; then
-            echo "Deploying Video Service..."
             kubectl apply -f deploy/video-service/kubernetes/video-service.yaml
+          else
+            # 否则，按需部署变更的服务
+            if [[ "${{ steps.changes.outputs.gateway }}" == "true" ]]; then
+              echo "Deploying Gateway..."
+              kubectl apply -f deploy/gateway/kubernetes/gateway.yaml
+            fi
+            if [[ "${{ steps.changes.outputs.user_service }}" == "true" ]]; then
+              echo "Deploying User Service..."
+              kubectl apply -f deploy/user-service/kubernetes/user-service.yaml
+            fi
+            if [[ "${{ steps.changes.outputs.video_service }}" == "true" ]]; then
+              echo "Deploying Video Service..."
+              kubectl apply -f deploy/video-service/kubernetes/video-service.yaml
+            fi
           fi
