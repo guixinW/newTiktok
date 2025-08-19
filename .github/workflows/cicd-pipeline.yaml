@@ -155,13 +155,16 @@ jobs:
           echo "Deploying changed services to Kubernetes..."
           if [[ "${{ steps.changes.outputs.gateway }}" == "true" ]]; then
             echo "Deploying Gateway..."
+            kubectl delete -f deploy/gateway/kubernetes/gateway.yaml
             kubectl apply -f deploy/gateway/kubernetes/gateway.yaml
           fi
           if [[ "${{ steps.changes.outputs.user_service }}" == "true" ]]; then
             echo "Deploying User Service..."
+            kubectl delete -f deploy/user-service/kubernetes/user-service.yaml
             kubectl apply -f deploy/user-service/kubernetes/user-service.yaml
           fi
           if [[ "${{ steps.changes.outputs.video_service }}" == "true" ]]; then
             echo "Deploying Video Service..."
+            kubectl delete -f deploy/video-service/kubernetes/video-service.yaml
             kubectl apply -f deploy/video-service/kubernetes/video-service.yaml
           fi
