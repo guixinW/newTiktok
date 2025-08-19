@@ -177,3 +177,38 @@ func (h *UserHandler) GetUserInfo(c *gin.Context) {
 		"user":        user,
 	})
 }
+
+func (h *UserHandler) RefreshToken(c *gin.Context) {
+	var req RefreshTokenRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		h.logger.Error("invalid request body", "error", err)
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status_code": http.StatusBadRequest,
+			"status_msg":  "Invalid request parameters",
+		})
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	resp, err := h.userClient.RefreshAccessToken(ctx, &userpb.AccessTokenRequest{
+		UserId:       req.UserId,
+		RefreshToken: req.RefreshToken,
+		DeviceId:     req.DeviceId,
+	})
+	if err != nil {
+		h.logger.Error("refresh token failed", "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status_code": http.StatusInternalServerError,
+			"status_msg":  "Internal server error",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status_code":  resp.StatusCode,
+		"status_msg":   resp.StatusMsg,
+		"access_token": resp.AccessToken,
+	})
+}

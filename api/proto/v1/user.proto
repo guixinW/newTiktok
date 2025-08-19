@@ -76,7 +76,27 @@ message UserInfoResponse {
   User user = 3;
 }
 
+//  ==========================Token============================
+message  AccessTokenRequest{
+  // @gotags: json:"user_id"
+  uint64 user_id = 1;
+  // @gotags: json:"refresh_token"
+  string refresh_token = 2;
+  // @gotags: json:"device_id"
+  string device_id = 3;
+}
+
+message  AccessTokenResponse{
+  // @gotags: json:"status_code"
+  int32 status_code = 1;
+  // @gotags: json:"status_msg"
+  string status_msg = 2;
+  // @gotags: json:"access_token"
+  string access_token = 3;
+}
+
 service UserService{
+  rpc RefreshAccessToken(AccessTokenRequest) returns (AccessTokenResponse){}
   rpc UserRegister(UserRegisterRequest) returns (UserRegisterResponse){}
   rpc Login(UserLoginRequest) returns (UserLoginResponse){}
   rpc UserInfo(UserInfoRequest) returns (UserInfoResponse){}

@@ -56,6 +56,7 @@ func main() {
 			user.POST("/register", userHandler.Register)
 			user.POST("/login", userHandler.Login)
 			user.GET("/info", userHandler.GetUserInfo)
+			user.POST("/token/refresh", userHandler.RefreshToken)
 		}
 	}
 
