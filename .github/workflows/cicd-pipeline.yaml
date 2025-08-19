@@ -12,7 +12,6 @@ on:
       - 'pkg/**'
       - 'go.mod'
       - 'go.sum'
-      # [关键修改 1] 添加 workflow 文件本身到触发路径
       - '.github/workflows/cicd-pipeline.yaml'
 
 jobs:
@@ -23,13 +22,14 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 0 # Fetch all history for accurate diff
           clean: true
 
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
           go-version: '1.23.0'
+          cache: false # Disable caching to prevent conflicts on self-hosted runner
 
       - name: Run Go Tests
         run: go test -v ./...
@@ -48,115 +48,120 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 0 # Fetch all history for accurate diff
           clean: true
 
-      - name: Find changed files
+      - name: Detect changed services
         id: changes
-        uses: tj-actions/changed-files@v44
-        with:
-          # 我们需要获取所有变更文件的列表，所以这里的 path 保持默认即可
-          since_last_remote_commit: true
-          files_yaml: |
-            gateway:
-              - cmd/gateway/**
-              - internal/gateway/**
-              - deploy/gateway/**
-              - api/**
-              - go.mod
-              - go.sum
-              - pkg/**
-            user_service:
-              - cmd/user_service/**
-              - internal/user/**
-              - deploy/user-service/**
-              - api/proto/v1/user.proto
-              - api/proto/v2/user.proto
-              - go.mod
-              - go.sum
-              - pkg/**
-            video_service:
-              - cmd/video_service/**
-              - internal/video/**
-              - deploy/video-service/**
-              - api/proto/v1/video.proto
-              - go.mod
-              - go.sum
-              - pkg/**
+        run: |
+          # Get changed files using git diff
+          CHANGED_FILES=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }})
+          if [ -z "$CHANGED_FILES" ]; then
+            echo "No changes detected. Exiting."
+            echo "any_changed=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # Set initial state
+          gateway_changed=false
+          user_service_changed=false
+          video_service_changed=false
+
+          echo "Detected changed files:"
+          echo "$CHANGED_FILES"
+
+          # Define patterns for each service
+          gateway_patterns=("cmd/gateway/" "internal/gateway/" "deploy/gateway/" "api/" "pkg/" "go.mod" "go.sum" ".github/workflows/cicd-pipeline.yaml")
+          user_service_patterns=("cmd/user_service/" "internal/user/" "deploy/user-service/" "api/proto/v1/user.proto" "api/proto/v2/user.proto" "pkg/" "go.mod" "go.sum" ".github/workflows/cicd-pipeline.yaml")
+          video_service_patterns=("cmd/video_service/" "internal/video/" "deploy/video-service/" "api/proto/v1/video.proto" "pkg/" "go.mod" "go.sum" ".github/workflows/cicd-pipeline.yaml")
+
+          # Check each service
+          while IFS= read -r file; do
+            for pattern in "${gateway_patterns[@]}"; do
+              if [[ "$file" == $pattern* ]]; then gateway_changed=true; fi
+            done
+            for pattern in "${user_service_patterns[@]}"; do
+              if [[ "$file" == $pattern* ]]; then user_service_changed=true; fi
+            done
+            for pattern in "${video_service_patterns[@]}"; do
+              if [[ "$file" == $pattern* ]]; then video_service_changed=true; fi
+            done
+          done <<< "$CHANGED_FILES"
+
+          any_changed=false
+          if [[ "$gateway_changed" == true || "$user_service_changed" == true || "$video_service_changed" == true ]]; then
+            any_changed=true
+          fi
+
+          # Set outputs
+          echo "gateway=$gateway_changed" >> $GITHUB_OUTPUT
+          echo "user_service=$user_service_changed" >> $GITHUB_OUTPUT
+          echo "video_service=$video_service_changed" >> $GITHUB_OUTPUT
+          echo "any_changed=$any_changed" >> $GITHUB_OUTPUT
+          echo "all_changed_files<<EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGED_FILES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Debug changed files output
+        if: always()
         run: |
-          echo "--- Verifying changed-files action outputs ---"
-          echo "Gateway changed: ${{ steps.changes.outputs.gateway }}"
-          echo "User Service changed: ${{ steps.changes.outputs.user_service }}"
-          echo "Video Service changed: ${{ steps.changes.outputs.video_service }}"
+          echo "--- Verifying changed-files script outputs ---"
+          echo "any_changed: ${{ steps.changes.outputs.any_changed }}"
+          echo "gateway_changed: ${{ steps.changes.outputs.gateway }}"
+          echo "user_service_changed: ${{ steps.changes.outputs.user_service }}"
+          echo "video_service_changed: ${{ steps.changes.outputs.video_service }}"
           echo "--------------------------------------------------"
-          echo "All changed files detected by the action:"
+          echo "All changed files detected by the script:"
           echo "${{ steps.changes.outputs.all_changed_files }}"
-          echo "--------------------------------------------------"
-          echo "Manually verifying git diff on runner:"
-          git diff --name-only ${{ github.event.before }} ${{ github.sha }}
 
-      # --- 分别构建、加载和部署已变更的服务 ---
+      # --- Build, Load, and Deploy changed services ---
 
       - name: Build and Load Gateway
-        # [关键修改 2] 增加对 workflow 文件变更的判断
-        if: steps.changes.outputs.gateway == 'true' || contains(steps.changes.outputs.all_changed_files, '.github/workflows/cicd-pipeline.yaml')
+        if: steps.changes.outputs.gateway == 'true'
         run: |
-          echo "Building Gateway image (Triggered by service code or workflow change)..."
+          echo "Building Gateway image..."
           docker build -t gateway:latest \
             --build-arg HTTP_PROXY=http://host.docker.internal:7897 \
             --build-arg HTTPS_PROXY=http://host.docker.internal:7897 \
             -f deploy/gateway/Dockerfile .
           echo "Loading Gateway image into Kind..."
-          kind load docker-image gateway:latest
+          kind load docker-image gateway:latest --name dev-cluster
 
       - name: Build and Load User Service
-        # [关键修改 2] 增加对 workflow 文件变更的判断
-        if: steps.changes.outputs.user_service == 'true' || contains(steps.changes.outputs.all_changed_files, '.github/workflows/cicd-pipeline.yaml')
+        if: steps.changes.outputs.user_service == 'true'
         run: |
-          echo "Building User Service image (Triggered by service code or workflow change)..."
+          echo "Building User Service image..."
           docker build -t user-service:latest \
             --build-arg HTTP_PROXY=http://host.docker.internal:7897 \
             --build-arg HTTPS_PROXY=http://host.docker.internal:7897 \
             -f deploy/user-service/Dockerfile .
           echo "Loading User Service image into Kind..."
-          kind load docker-image user-service:latest
+          kind load docker-image user-service:latest --name dev-cluster
 
       - name: Build and Load Video Service
-        # [关键修改 2] 增加对 workflow 文件变更的判断
-        if: steps.changes.outputs.video_service == 'true' || contains(steps.changes.outputs.all_changed_files, '.github/workflows/cicd-pipeline.yaml')
+        if: steps.changes.outputs.video_service == 'true'
         run: |
-          echo "Building Video Service image (Triggered by service code or workflow change)..."
+          echo "Building Video Service image..."
           docker build -t video-service:latest \
             --build-arg HTTP_PROXY=http://host.docker.internal:7897 \
             --build-arg HTTPS_PROXY=http://host.docker.internal:7897 \
             -f deploy/video-service/Dockerfile .
           echo "Loading Video Service image into Kind..."
-          kind load docker-image video-service:latest
+          kind load docker-image video-service:latest --name dev-cluster
 
       - name: Deploy services to Kubernetes
-        # [关键修改 2] 增加对 workflow 文件变更的判断
-        if: steps.changes.outputs.gateway == 'true' || steps.changes.outputs.user_service == 'true' || steps.changes.outputs.video_service == 'true' || contains(steps.changes.outputs.all_changed_files, '.github/workflows/cicd-pipeline.yaml')
+        if: steps.changes.outputs.any_changed == 'true'
         run: |
-          # 如果工作流文件被修改，则强制部署所有服务
-          if [[ "${{ contains(steps.changes.outputs.all_changed_files, '.github/workflows/cicd-pipeline.yaml') }}" == "true" ]]; then
-            echo "Workflow file changed, deploying all services..."
+          echo "Deploying changed services to Kubernetes..."
+          if [[ "${{ steps.changes.outputs.gateway }}" == "true" ]]; then
+            echo "Deploying Gateway..."
             kubectl apply -f deploy/gateway/kubernetes/gateway.yaml
+          fi
+          if [[ "${{ steps.changes.outputs.user_service }}" == "true" ]]; then
+            echo "Deploying User Service..."
             kubectl apply -f deploy/user-service/kubernetes/user-service.yaml
+          fi
+          if [[ "${{ steps.changes.outputs.video_service }}" == "true" ]]; then
+            echo "Deploying Video Service..."
             kubectl apply -f deploy/video-service/kubernetes/video-service.yaml
-          else
-            # 否则，按需部署变更的服务
-            if [[ "${{ steps.changes.outputs.gateway }}" == "true" ]]; then
-              echo "Deploying Gateway..."
-              kubectl apply -f deploy/gateway/kubernetes/gateway.yaml
-            fi
-            if [[ "${{ steps.changes.outputs.user_service }}" == "true" ]]; then
-              echo "Deploying User Service..."
-              kubectl apply -f deploy/user-service/kubernetes/user-service.yaml
-            fi
-            if [[ "${{ steps.changes.outputs.video_service }}" == "true" ]]; then
-              echo "Deploying Video Service..."
-              kubectl apply -f deploy/video-service/kubernetes/video-service.yaml
-            fi
           fi
