@@ -14,8 +14,8 @@ echo "📍 工作目录: $SCRIPT_DIR"
 
 # 创建数据目录
 echo "📁 创建数据持久化目录..."
-mkdir -p "$SCRIPT_DIR/data/mysql" "$SCRIPT_DIR/data/redis"
-echo "✅ 数据目录创建完成: $SCRIPT_DIR/data/mysql, $SCRIPT_DIR/data/redis"
+mkdir -p "$SCRIPT_DIR/data/mysql" "$SCRIPT_DIR/data/redis" "$SCRIPT_DIR/data/etcd"
+echo "✅ 数据目录创建完成: $SCRIPT_DIR/data/mysql, $SCRIPT_DIR/data/redis, $SCRIPT_DIR/data/etcd"
 
 # 检查kind配置文件是否存在
 if [[ ! -f "$SCRIPT_DIR/kind-config.yaml" ]]; then
@@ -105,3 +105,16 @@ echo "   删除集群: kind delete cluster --name dev-cluster"
 echo "   切换context: kubectl config use-context kind-dev-cluster"
 echo ""
 echo "✨ 现在可以开始部署应用了!"
+
+# 部署数据库
+echo "🚀 正在部署数据库..."
+kubectl apply -f ../deploy/database/mysql-pv.yaml
+kubectl apply -f ../deploy/database/mysql.yaml
+kubectl apply -f ../deploy/database/redis-pv.yaml
+kubectl apply -f ../deploy/database/redis.yaml
+kubectl apply -f ../deploy/database/etcd-pv.yaml
+kubectl apply -f ../deploy/database/etcd.yaml
+echo "✅ 数据库部署完成!"
+
+echo "🎉 所有部署完成!"
+echo "✨ 集群 'dev-cluster' 已准备就绪!"

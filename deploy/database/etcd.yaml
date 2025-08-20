@@ -1,0 +1,58 @@
+# etcd.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: etcd
+spec:
+  ports:
+    - name: client
+      port: 2379
+      targetPort: 2379
+    - name: peer
+      port: 2380
+      targetPort: 2380
+  selector:
+    app: etcd
+  clusterIP: None # Headless Service
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: etcd
+spec:
+  serviceName: "etcd"
+  replicas: 1
+  selector:
+    matchLabels:
+      app: etcd
+  template:
+    metadata:
+      labels:
+        app: etcd
+    spec:
+      containers:
+        - name: etcd
+          image: quay.io/coreos/etcd:v3.5.9
+          ports:
+            - containerPort: 2379
+              name: client
+            - containerPort: 2380
+              name: peer
+          volumeMounts:
+            - name: etcd-data
+              mountPath: /var/run/etcd
+          command:
+            - /usr/local/bin/etcd
+            - --name=etcd
+            - --data-dir=/var/run/etcd/default.etcd
+            - --listen-client-urls=http://0.0.0.0:2379
+            - --advertise-client-urls=http://etcd:2379
+            - --listen-peer-urls=http://0.0.0.0:2380
+            - --initial-advertise-peer-urls=http://etcd:2380
+            - --initial-cluster=etcd=http://etcd:2380
+            - --initial-cluster-token=etcd-cluster-1
+            - --initial-cluster-state=new
+      volumes:
+        - name: etcd-data
+          persistentVolumeClaim:
+            claimName: etcd-pvc

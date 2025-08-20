@@ -28,3 +28,6 @@ nodes:
       # Redis 数据持久化挂载
       - hostPath: ./data/redis
         containerPath: /data/redis
+      # Etcd 数据持久化挂载
+      - hostPath: ./data/etcd
+        containerPath: /data/etcd

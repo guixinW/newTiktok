@@ -19,6 +19,7 @@
 SERVICES=(
   "mysql default 3306:3306"
   "redis default 6379:6379"
+  "etcd default 2379:2379"
   "user-service default 50051:50051"
   "video-service default 50052:50052"
   "gateway-service default 8081:8081"
