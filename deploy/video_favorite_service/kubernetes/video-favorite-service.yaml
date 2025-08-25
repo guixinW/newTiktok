@@ -1,0 +1,58 @@
+# Deployment for the video_favorite service
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: video-favorite-service-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: video-favorite-service
+  template:
+    metadata:
+      labels:
+        app: video-favorite-service
+    spec:
+      containers:
+        - name: video-favorite-service
+          image: video-favorite-service:latest
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 50053
+              name: grpc # 为端口添加名称是一个好习惯
+          env:
+            - name: CONFIG_PATH
+              value: "/app/config.yaml"
+          volumeMounts:
+            - name: config-volume
+              mountPath: /app/config.yaml
+              subPath: config.yaml
+      volumes:
+        - name: config-volume
+          configMap:
+            name: video-favorite-service-config
+---
+# Service to expose the video_favorite service deployment internally for Kong
+apiVersion: v1
+kind: Service
+metadata:
+  name: video-favorite-service
+  annotations:
+    # MODIFICATION: Annotation moved here from the Deployment.
+    # This tells Kong to use the gRPC protocol when communicating with this Service.
+    konghq.com/protocol: grpc
+spec:
+  # MODIFICATION: Changed from NodePort to ClusterIP.
+  # The Service only needs to be accessible inside the cluster by Kong.
+  type: ClusterIP
+  selector:
+    app: video-favorite-service
+  ports:
+    - name: grpc # 端口名称与容器端口的名称匹配
+      protocol: TCP
+      # RECOMMENDED: Explicitly declare the application protocol.
+      appProtocol: grpc
+      port: 50053
+      targetPort: 50053
+
+

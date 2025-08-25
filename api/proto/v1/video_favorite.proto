@@ -1,0 +1,53 @@
+syntax = "proto3";
+option go_package = "pkg/pb/video_favorite";
+package favorite;
+import "video.proto";
+
+//  ================视频点赞、踩操作========================
+enum VideoActionType {
+  // 点赞
+  LIKE = 0;
+  // 踩
+  DISLIKE = 1;
+  // 取消点赞
+  CANCEL_LIKE = 2;
+  // 取消踩
+  CANCEL_DISLIKE= 3;
+  // 错误类型
+  WRONG_TYPE = 4;
+}
+
+message FavoriteActionRequest {
+  // @gotags: json:"token_user_id"
+  uint64 token_user_id = 1;
+  // @gotags: json:"video_id"
+  uint64 video_id = 2;
+  // @gotags: json:"action_type"
+  VideoActionType action_type = 3;
+}
+
+message FavoriteActionResponse {
+  // @gotags: json:"status_code"
+  int32 status_code = 1;
+  // @gotags: json:"status_msg"
+  string status_msg = 2;
+}
+
+//  ==============================点赞列表=======================================
+message FavoriteListRequest {
+  // @gotags: json:"user_id"
+  uint64 user_id = 1;
+  // @gotags: json:"token_user_id"
+  uint64 token_user_id = 2;
+}
+
+message FavoriteListResponse {
+  int32 status_code = 1; // 状态码，0-成功，其他值-失败
+  string status_msg = 2; // 返回状态描述
+  repeated video.Video video_list = 3; // 用户点赞视频列表
+}
+
+service FavoriteService {
+  rpc FavoriteAction (FavoriteActionRequest) returns (FavoriteActionResponse);
+  rpc FavoriteList (FavoriteListRequest) returns (FavoriteListResponse);
+}
