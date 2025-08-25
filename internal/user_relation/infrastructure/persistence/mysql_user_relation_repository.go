@@ -2,18 +2,18 @@ package persistence
 
 import (
 	"context"
-	"database/sql"
+	"gorm.io/gorm"
 	"newTiktoken/internal/user_relation/domain/model"
 	"newTiktoken/internal/user_relation/domain/repository"
 )
 
 // MySQLUserRelationRepository is the MySQL implementation of the UserRelationRepository.
 type MySQLUserRelationRepository struct {
-	db *sql.DB
+	db *gorm.DB
 }
 
 // NewMySQLUserRelationRepository creates a new MySQLUserRelationRepository.
-func NewMySQLUserRelationRepository(db *sql.DB) repository.UserRelationRepository {
+func NewMySQLUserRelationRepository(db *gorm.DB) repository.UserRelationRepository {
 	return &MySQLUserRelationRepository{db: db}
 }
 

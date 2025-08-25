@@ -1,16 +1,20 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/reflection"
+	"gorm.io/driver/mysql"
+	"gorm.io/gorm"
 	"log"
 	"net"
-	"os"
-	"os/signal"
+	"newTiktoken/internal/user_relation/application"
+	"newTiktoken/internal/user_relation/infrastructure/persistence"
+	grpcinterface "newTiktoken/internal/user_relation/interfaces/grpc"
 	"newTiktoken/pkg/config"
 	"newTiktoken/pkg/logger"
-	"syscall"
+	userRelationPb "newTiktoken/pkg/pb/user_relation"
+	"os"
 )
 
 func main() {
@@ -24,32 +28,33 @@ func main() {
 	appLogger := logger.New(cfg.LogLevel)
 	appLogger.Info("starting user relation service...")
 
+	db, err := gorm.Open(mysql.Open(cfg.Database.DSN), &gorm.Config{})
+	if err != nil {
+		appLogger.Error("failed to connect to database", "error", err)
+		os.Exit(1)
+	}
+	mysqlRepo := persistence.NewMySQLUserRelationRepository(db)
+
+	// 创建 Application
+	userRelationApp := application.NewUserRelationApplicationService(mysqlRepo, appLogger)
+
 	// 创建 gRPC 服务器
-	server := grpc.NewServer()
+	grpcServer := grpcinterface.NewUserRelationServer(userRelationApp)
 
 	// 注册服务
-	// user_relation.RegisterUserRelationServiceServer(server, &userRelationService{})
+	s := grpc.NewServer()
+	userRelationPb.RegisterRelationServiceServer(s, grpcServer)
+	reflection.Register(s)
 
-	// 启动服务器
-	go func() {
-		lis, err := net.Listen("tcp", fmt.Sprintf(":%d", cfg.UserRelationService.Port))
-		if err != nil {
-			appLogger.Error("failed to listen", "error", err)
-			os.Exit(1)
-		}
-		if err := server.Serve(lis); err != nil {
-			appLogger.Error("failed to serve", "error", err)
-			os.Exit(1)
-		}
-	}()
-
-	appLogger.Info("user relation service started", "port", cfg.UserRelationService.Port)
-
-	// 优雅地关闭
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-	<-quit
-	appLogger.Info("shutting down user relation service...")
-	server.GracefulStop()
-	appLogger.Info("user relation service stopped")
+	// 开始服务
+	lis, err := net.Listen("tcp", fmt.Sprintf(":%s", cfg.Port))
+	if err != nil {
+		appLogger.Error("failed to listen", "port", cfg.Port, "error", err)
+		os.Exit(1)
+	}
+	appLogger.Info("user service listening", "port", cfg.Port)
+	if err := s.Serve(lis); err != nil {
+		appLogger.Error("failed to serve gRPC server", "error", err)
+		os.Exit(1)
+	}
 }
