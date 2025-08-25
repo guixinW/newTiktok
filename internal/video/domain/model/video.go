@@ -1,6 +1,6 @@
 package model
 
-import "newTiktoken/pkg/userpb"
+import userpb "newTiktoken/pkg/pb/user"
 
 // Video corresponds to the Video message in video.proto.
 // This is the core domain model for a video.

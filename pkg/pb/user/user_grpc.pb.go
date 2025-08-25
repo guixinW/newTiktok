@@ -2,9 +2,9 @@
 // versions:
 // - protoc-gen-go-grpc v1.2.0
 // - protoc             v5.29.1
-// source: api/proto/v1/user.proto
+// source: user.proto
 
-package userpb
+package user
 
 import (
 	context "context"
@@ -209,5 +209,5 @@ var UserService_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "api/proto/v1/user.proto",
+	Metadata: "user.proto",
 }

@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"newTiktoken/internal/video/domain/model"
 	"newTiktoken/internal/video/domain/repository"
-	"newTiktoken/pkg/userpb"
+	"newTiktoken/pkg/pb/user"
 	"time"
 
 	"gorm.io/gorm"
@@ -50,7 +50,7 @@ func (GormVideo) TableName() string {
 func (g *GormVideo) toDomainModel() *model.Video {
 	return &model.Video{
 		ID: g.ID,
-		Author: &userpb.User{
+		Author: &user.User{
 			Id:             g.Author.ID,
 			Name:           g.Author.Username, // Correctly map Username to Name
 			FollowingCount: g.Author.FollowingCount,

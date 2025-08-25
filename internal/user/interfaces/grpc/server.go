@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"newTiktoken/internal/user/application"
 	"newTiktoken/internal/user/domain/model"
-	pb "newTiktoken/pkg/userpb" // 引入生成的 pb 文件
+	pb "newTiktoken/pkg/pb/user" // 引入生成的 pb 文件
 	"time"
 )
 

@@ -1,5 +1,5 @@
 syntax = "proto3";
-option go_package = "newTiktoken/pkg/videopb";
+option go_package = "./pkg/pb/video";
 package video;
 import "user.proto";
 

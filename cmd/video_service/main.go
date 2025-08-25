@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"newTiktoken/pkg/videopb"
 	"os"
 
 	"github.com/go-redis/redis/v8"
@@ -18,7 +19,7 @@ import (
 	grpcvideo "newTiktoken/internal/video/interfaces/grpc"
 	"newTiktoken/pkg/config"
 	"newTiktoken/pkg/logger"
-	"newTiktoken/pkg/videopb"
+	"newTiktoken/pkg/pb/video"
 )
 
 func main() {
@@ -77,7 +78,7 @@ func main() {
 
 	// 8. Create and register gRPC service
 	s := grpc.NewServer()
-	videopb.RegisterVideoServiceServer(s, videoServiceServer)
+	video.RegisterVideoServiceServer(s, videoServiceServer)
 	reflection.Register(s)
 
 	// 9. Start the service

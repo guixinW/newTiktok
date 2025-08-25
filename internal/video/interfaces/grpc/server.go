@@ -4,7 +4,7 @@ import (
 	"context"
 	"newTiktoken/internal/video/application"
 	"newTiktoken/internal/video/domain/model"
-	"newTiktoken/pkg/videopb"
+	videopb "newTiktoken/pkg/pb/video"
 )
 
 // Server is the gRPC server for the video service. It implements the generated interface.
