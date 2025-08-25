@@ -1,16 +1,20 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/reflection"
+	"gorm.io/driver/mysql"
+	"gorm.io/gorm"
 	"log"
 	"net"
-	"os"
-	"os/signal"
+	"newTiktoken/internal/video_comment/application"
+	"newTiktoken/internal/video_comment/infrastructure/persistence"
+	grpcinterface "newTiktoken/internal/video_comment/interfaces/grpc"
 	"newTiktoken/pkg/config"
 	"newTiktoken/pkg/logger"
-	"syscall"
+	videoCommentPb "newTiktoken/pkg/pb/video_comment"
+	"os"
 )
 
 func main() {
@@ -22,34 +26,35 @@ func main() {
 
 	// 初始化日志
 	appLogger := logger.New(cfg.LogLevel)
-	appLogger.Info("starting video comment service...")
+	appLogger.Info("starting user relation service...")
+
+	db, err := gorm.Open(mysql.Open(cfg.Database.DSN), &gorm.Config{})
+	if err != nil {
+		appLogger.Error("failed to connect to database", "error", err)
+		os.Exit(1)
+	}
+	mysqlRepo := persistence.NewMySQLVideoCommentRepository(db)
+
+	// 创建 Application
+	videoCommentApp := application.NewCommentApplicationService(mysqlRepo, appLogger)
 
 	// 创建 gRPC 服务器
-	server := grpc.NewServer()
+	grpcServer := grpcinterface.NewCommentServer(videoCommentApp)
 
 	// 注册服务
-	// commnet.RegisterCommentServiceServer(server, &commentService{})
+	s := grpc.NewServer()
+	videoCommentPb.RegisterCommentServiceServer(s, grpcServer)
+	reflection.Register(s)
 
-	// 启动服务器
-	go func() {
-		lis, err := net.Listen("tcp", fmt.Sprintf(":%d", cfg.VideoCommentService.Port))
-		if err != nil {
-			appLogger.Error("failed to listen", "error", err)
-			os.Exit(1)
-		}
-		if err := server.Serve(lis); err != nil {
-			appLogger.Error("failed to serve", "error", err)
-			os.Exit(1)
-		}
-	}()
-
-	appLogger.Info("video comment service started", "port", cfg.VideoCommentService.Port)
-
-	// 优雅地关闭
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-	<-quit
-	appLogger.Info("shutting down video comment service...")
-	server.GracefulStop()
-	appLogger.Info("video comment service stopped")
+	// 开始服务
+	lis, err := net.Listen("tcp", fmt.Sprintf(":%s", cfg.Port))
+	if err != nil {
+		appLogger.Error("failed to listen", "port", cfg.Port, "error", err)
+		os.Exit(1)
+	}
+	appLogger.Info("user service listening", "port", cfg.Port)
+	if err := s.Serve(lis); err != nil {
+		appLogger.Error("failed to serve gRPC server", "error", err)
+		os.Exit(1)
+	}
 }

@@ -17,13 +17,11 @@ func NewCommentServer(appSvc *application.CommentApplicationService) *CommentSer
 	return &CommentServer{appSvc: appSvc}
 }
 
-// CommentAction implements the gRPC CommentAction method.
 func (s *CommentServer) CommentAction(ctx context.Context, req *video_comment.CommentActionRequest) (*video_comment.CommentActionResponse, error) {
 	// TODO: Implement request handling
 	return &video_comment.CommentActionResponse{}, nil
 }
 
-// CommentList implements the gRPC CommentList method.
 func (s *CommentServer) CommentList(ctx context.Context, req *video_comment.CommentListRequest) (*video_comment.CommentListResponse, error) {
 	// TODO: Implement request handling
 	return &video_comment.CommentListResponse{}, nil

@@ -2,18 +2,18 @@ package persistence
 
 import (
 	"context"
-	"database/sql"
+	"gorm.io/gorm"
 	"newTiktoken/internal/video_comment/domain/model"
 	"newTiktoken/internal/video_comment/domain/repository"
 )
 
 // MySQLVideoCommentRepository is the MySQL implementation of the VideoCommentRepository.
 type MySQLVideoCommentRepository struct {
-	db *sql.DB
+	db *gorm.DB
 }
 
 // NewMySQLVideoCommentRepository creates a new MySQLVideoCommentRepository.
-func NewMySQLVideoCommentRepository(db *sql.DB) repository.VideoCommentRepository {
+func NewMySQLVideoCommentRepository(db *gorm.DB) repository.VideoCommentRepository {
 	return &MySQLVideoCommentRepository{db: db}
 }
 
