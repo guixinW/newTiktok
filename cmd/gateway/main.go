@@ -16,7 +16,7 @@ import (
 	"newTiktoken/internal/gateway/handlers"
 	"newTiktoken/pkg/config"
 	"newTiktoken/pkg/logger"
-	"newTiktoken/pkg/userpb"
+	userPb "newTiktoken/pkg/pb/user"
 )
 
 func main() {
@@ -38,7 +38,7 @@ func main() {
 	}
 	defer userConn.Close()
 
-	userClient := userpb.NewUserServiceClient(userConn)
+	userClient := userPb.NewUserServiceClient(userConn)
 	appLogger.Info("connected to user service", "port", cfg.UserService.Port)
 
 	userHandler := handlers.NewUserHandler(userClient, appLogger)

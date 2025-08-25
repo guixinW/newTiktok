@@ -8,15 +8,15 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"newTiktoken/pkg/userpb"
+	"newTiktoken/pkg/pb/user"
 )
 
 type UserHandler struct {
-	userClient userpb.UserServiceClient
+	userClient user.UserServiceClient
 	logger     *slog.Logger
 }
 
-func NewUserHandler(userClient userpb.UserServiceClient, logger *slog.Logger) *UserHandler {
+func NewUserHandler(userClient user.UserServiceClient, logger *slog.Logger) *UserHandler {
 	return &UserHandler{
 		userClient: userClient,
 		logger:     logger,
@@ -54,7 +54,7 @@ func (h *UserHandler) Register(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	resp, err := h.userClient.UserRegister(ctx, &userpb.UserRegisterRequest{
+	resp, err := h.userClient.UserRegister(ctx, &user.UserRegisterRequest{
 		Username: req.Username,
 		Password: req.Password,
 	})
@@ -88,7 +88,7 @@ func (h *UserHandler) Login(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	resp, err := h.userClient.Login(ctx, &userpb.UserLoginRequest{
+	resp, err := h.userClient.Login(ctx, &user.UserLoginRequest{
 		Username: req.Username,
 		Password: req.Password,
 		DeviceId: req.DeviceId,
@@ -144,7 +144,7 @@ func (h *UserHandler) GetUserInfo(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	resp, err := h.userClient.UserInfo(ctx, &userpb.UserInfoRequest{
+	resp, err := h.userClient.UserInfo(ctx, &user.UserInfoRequest{
 		QueryUserId: userId,
 		TokenUserId: tokenUserId,
 	})
@@ -192,7 +192,7 @@ func (h *UserHandler) RefreshToken(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	resp, err := h.userClient.RefreshAccessToken(ctx, &userpb.AccessTokenRequest{
+	resp, err := h.userClient.RefreshAccessToken(ctx, &user.AccessTokenRequest{
 		UserId:       req.UserId,
 		RefreshToken: req.RefreshToken,
 		DeviceId:     req.DeviceId,
