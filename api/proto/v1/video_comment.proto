@@ -1,0 +1,52 @@
+syntax = "proto3";
+option go_package = "/pkg/pb/video_comment";
+package comment;
+import "user.proto";
+
+//  ===========================发布or删除评论==================================
+enum CommentActionType {
+  // 评论
+  COMMENT = 0;
+  // 删除评论
+  DELETE_COMMENT = 1;
+  // 错误的类型
+  WRONG_TYPE = 2;
+}
+
+message CommentActionRequest {
+  uint64 token_user_id = 1;
+  uint64 video_id = 2;
+  CommentActionType action_type = 3;
+  string comment_text = 4;
+  uint64 comment_id = 5;
+}
+
+message CommentActionResponse {
+  int32 status_code = 1;
+  string status_msg = 2;
+  Comment comment = 3;  //评论成功时返回原评论，避免因为需要更新前端进而重新请求评论列表
+}
+
+message Comment {
+  uint64 id = 1;
+  user.User user = 2;
+  string content = 3;
+  uint64 create_at = 4;
+}
+
+//  ==============================评论列表========================================
+message CommentListRequest {
+  uint64 token_user_id = 1;
+  uint64 video_id = 2;
+}
+
+message CommentListResponse {
+  int32 status_code = 1;
+  string status_msg = 2;
+  repeated Comment comment_list = 3;
+}
+
+service CommentService {
+  rpc CommentAction(CommentActionRequest) returns(CommentActionResponse);
+  rpc CommentList(CommentListRequest) returns(CommentListResponse);
+}

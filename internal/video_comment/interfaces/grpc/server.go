@@ -1,0 +1,30 @@
+package grpc
+
+import (
+	"context"
+	"newTiktoken/internal/video_comment/application"
+	"newTiktoken/pkg/pb/video_comment"
+)
+
+// CommentServer is the gRPC server for the comment service.
+type CommentServer struct {
+	video_comment.UnimplementedCommentServiceServer
+	appSvc *application.CommentApplicationService
+}
+
+// NewCommentServer creates a new CommentServer.
+func NewCommentServer(appSvc *application.CommentApplicationService) *CommentServer {
+	return &CommentServer{appSvc: appSvc}
+}
+
+// CommentAction implements the gRPC CommentAction method.
+func (s *CommentServer) CommentAction(ctx context.Context, req *video_comment.CommentActionRequest) (*video_comment.CommentActionResponse, error) {
+	// TODO: Implement request handling
+	return &video_comment.CommentActionResponse{}, nil
+}
+
+// CommentList implements the gRPC CommentList method.
+func (s *CommentServer) CommentList(ctx context.Context, req *video_comment.CommentListRequest) (*video_comment.CommentListResponse, error) {
+	// TODO: Implement request handling
+	return &video_comment.CommentListResponse{}, nil
+}
