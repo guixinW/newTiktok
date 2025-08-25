@@ -2,6 +2,7 @@ package grpc
 
 import (
 	"context"
+	"log/slog"
 	"newTiktoken/internal/video_comment/application"
 	"newTiktoken/pkg/pb/video_comment"
 )
@@ -10,11 +11,15 @@ import (
 type CommentServer struct {
 	video_comment.UnimplementedCommentServiceServer
 	appSvc *application.CommentApplicationService
+	logger *slog.Logger
 }
 
 // NewCommentServer creates a new CommentServer.
-func NewCommentServer(appSvc *application.CommentApplicationService) *CommentServer {
-	return &CommentServer{appSvc: appSvc}
+func NewCommentServer(appSvc *application.CommentApplicationService, logger *slog.Logger) *CommentServer {
+	return &CommentServer{
+		appSvc: appSvc,
+		logger: logger,
+	}
 }
 
 func (s *CommentServer) CommentAction(ctx context.Context, req *video_comment.CommentActionRequest) (*video_comment.CommentActionResponse, error) {

@@ -39,7 +39,7 @@ func main() {
 	videoCommentApp := application.NewCommentApplicationService(mysqlRepo, appLogger)
 
 	// 创建 gRPC 服务器
-	grpcServer := grpcinterface.NewCommentServer(videoCommentApp)
+	grpcServer := grpcinterface.NewCommentServer(videoCommentApp, appLogger)
 
 	// 注册服务
 	s := grpc.NewServer()
