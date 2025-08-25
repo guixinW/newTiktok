@@ -39,7 +39,7 @@ func main() {
 	userRelationApp := application.NewUserRelationApplicationService(mysqlRepo, appLogger)
 
 	// 创建 gRPC 服务器
-	grpcServer := grpcinterface.NewUserRelationServer(userRelationApp)
+	grpcServer := grpcinterface.NewUserRelationServer(userRelationApp, appLogger)
 
 	// 注册服务
 	s := grpc.NewServer()

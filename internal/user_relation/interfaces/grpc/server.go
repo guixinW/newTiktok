@@ -15,8 +15,11 @@ type UserRelationServer struct {
 }
 
 // NewUserRelationServer creates a new UserRelationServer.
-func NewUserRelationServer(appSvc *application.UserRelationApplicationService) *UserRelationServer {
-	return &UserRelationServer{appSvc: appSvc}
+func NewUserRelationServer(appSvc *application.UserRelationApplicationService, logger *slog.Logger) *UserRelationServer {
+	return &UserRelationServer{
+		appSvc: appSvc,
+		logger: logger,
+	}
 }
 
 // RelationAction implements the gRPC RelationAction method.
