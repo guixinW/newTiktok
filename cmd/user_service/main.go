@@ -15,7 +15,7 @@ import (
 	grpcinterface "newTiktoken/internal/user/interfaces/grpc"
 	"newTiktoken/pkg/config"
 	"newTiktoken/pkg/logger"
-	"newTiktoken/pkg/pb/user"
+	userpb "newTiktoken/pkg/pb/user"
 	"os"
 )
 
@@ -75,7 +75,7 @@ func main() {
 	s := grpc.NewServer(
 		grpc.UnaryInterceptor(grpcServer.LogInterceptor),
 	)
-	user.RegisterUserServiceServer(s, grpcServer)
+	userpb.RegisterUserServiceServer(s, grpcServer)
 	reflection.Register(s)
 
 	// 9. Start the service

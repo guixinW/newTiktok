@@ -1,5 +1,5 @@
 syntax="proto3";
-option go_package = "./pkg/pb/user";
+option go_package = "pkg/pb/user";
 package user;
 
 //  =========================用户注册============================
