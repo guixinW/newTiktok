@@ -6,9 +6,6 @@
 
 /dev/data
 .claude
-# Binaries
-newTiktoken
-user_service
 
 # OS-specific
 .DS_Store
