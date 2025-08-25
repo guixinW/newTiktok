@@ -4,7 +4,7 @@ import (
 	"context"
 	"newTiktoken/internal/video/domain/model"
 	"newTiktoken/internal/video/domain/repository"
-	"newTiktoken/pkg/userpb"
+	userpb "newTiktoken/pkg/pb/user"
 	"time"
 )
 

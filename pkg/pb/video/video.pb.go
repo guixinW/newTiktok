@@ -9,7 +9,7 @@ package video
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
-	user "pkg/pb/user"
+	user "newTiktoken/pkg/pb/user"
 	reflect "reflect"
 	sync "sync"
 )
