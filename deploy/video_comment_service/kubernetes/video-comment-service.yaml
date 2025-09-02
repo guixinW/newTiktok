@@ -50,7 +50,7 @@ spec:
   ports:
     - name: grpc # 端口名称与容器端口的名称匹配
       protocol: TCP
-      # RECOMMENDED: Explicitly declare the application protocol.
+      # RECOMMENDED: Explicitly declare the service protocol.
       appProtocol: grpc
       port: 50054
       targetPort: 50054

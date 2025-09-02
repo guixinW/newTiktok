@@ -1,103 +1,64 @@
-syntax="proto3";
-option go_package = "pkg/pb/user";
-package user;
+// 使用 proto3 语法
+syntax = "proto3";
 
-//  =========================用户注册============================
-message UserRegisterRequest{
-  // @gotags: json:"username" binding:"required,max=32" validate:"required,max=32"
-  string username = 1;
-  // @gotags: json:"password" binding:"required,max=32" validate:"required,max=32"
-  string password = 2;
+// 定义包名，有助于防止命名冲突
+package user_v1;
+
+option go_package = "/internal/common/genproto/user";
+
+// 引入常用的 protobuf 类型
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/empty.proto";
+
+// 定义 User 服务的 gRPC 接口
+service UserService {
+  // RPC 方法 1: 创建用户 (对应 CreateUser Command)
+  // 这是一个幂等操作，如果用户已存在，不应返回错误。
+  rpc CreateUser(CreateUserRequest) returns (google.protobuf.Empty);
+
+  // RPC 方法 2: 更新用户信息 (对应 UpdateUser Command)
+  rpc UpdateUser(UpdateUserRequest) returns (google.protobuf.Empty);
+
+  // RPC 方法 3: 获取用户详细信息 (对应 InformationOfUser Query)
+  rpc GetUserInformation(GetUserInformationRequest) returns (User);
 }
 
-message UserRegisterResponse{
-  // @gotags: json:"status_code"
-  int32 status_code = 1;
-  // @gotags: json:"status_msg"
-  string status_msg = 2;
-  // @gotags: json:"user_id"
-  uint64 user_id = 3;
-}
+// --- 消息定义 ---
 
-//  =========================用户登录============================
-message UserLoginRequest {
-  // @gotags: json:"username" binding:"required,max=32" validate:"required,max=32"
-  string username = 1;
-  // @gotags: json:"password" binding:"required,max=32" validate:"required,max=32"
-  string password = 2;
-  // @gotags: json:"deviceId" binding:"required,max=32" validate:"required,max=32"
-  string deviceId = 3;
-}
-message UserLoginResponse {
-  // @gotags: json:"status_code"
-  int32 status_code = 1;
-  // @gotags: json:"status_msg"
-  string status_msg = 2;
-  // @gotags: json:"user_id"
-  uint64 user_id = 3;
-  // @gotags: json:"refresh_token"
-  string refresh_token = 4;
-  // @gotags: json:"access_token"
-  string access_token = 5;
-}
-
-//  ==========================用户信息============================
+// User 消息体，对应你的 query.User DTO
+// 这是服务间传输用户数据的标准结构
 message User {
-  // @gotags: json:"id"
-  uint64 id = 1;
-  // @gotags: json:"name"
+  string uuid = 1;
   string name = 2;
-  // @gotags: json:"following_count"
-  uint64 following_count = 3;
-  // @gotags: json:"follower_count"
-  uint64 follower_count = 4;
-  // @gotags: json:"is_follow"
-  bool is_follow = 5;
-  // @gotags: json:"total_favorite"
-  uint64 total_favorite = 6;
-  // @gotags: json:"work_count"
-  uint64 work_count = 7;
-  // @gotags: json:"favorite_count"
-  uint64 favorite_count = 8;
+  uint32 age = 3; // Protobuf 没有 uint16, 使用 uint32
+  uint32 gender = 4; // 0: UNKNOWN, 1: MALE, 2: FEMALE
+  uint64 following_count = 5;
+  uint64 follower_count = 6;
+  uint64 total_favorite = 7;
+  uint64 work_count = 8;
+  uint64 favorite_count = 9;
+  google.protobuf.Timestamp created_at = 10;
+  google.protobuf.Timestamp updated_at = 11;
 }
 
-//  ==========================用户信息============================
-message UserInfoRequest {
-  // @gotags: json:"user_id" form:"user_id" validate:"required" binding:"required"
-  uint64 query_user_id = 1;
-  // @gotags: json:"token_user_id" form:"token" binding:"required"
-  uint64 token_user_id = 2;
-}
-message UserInfoResponse {
-  // @gotags: json:"status_code"
-  int32 status_code = 1;
-  // @gotags: json:"status_msg"
-  string status_msg = 2;
-  User user = 3;
+// CreateUser RPC 的请求消息
+message CreateUserRequest {
+  string uuid = 1; // 必需，来自 Firebase
+  string name = 2; // 必需
+  // Age 和 Gender 在初次创建时可能是可选的
+  optional uint32 age = 3;
+  optional uint32 gender = 4;
 }
 
-//  ==========================Token============================
-message  AccessTokenRequest{
-  // @gotags: json:"user_id"
-  uint64 user_id = 1;
-  // @gotags: json:"refresh_token"
-  string refresh_token = 2;
-  // @gotags: json:"device_id"
-  string device_id = 3;
+// UpdateUser RPC 的请求消息
+message UpdateUserRequest {
+  string uuid = 1;   // 必需，指定要更新哪个用户
+  string name = 2;   // 必需
+  uint32 age = 3;    // 必需
+  uint32 gender = 4; // 必需
 }
 
-message  AccessTokenResponse{
-  // @gotags: json:"status_code"
-  int32 status_code = 1;
-  // @gotags: json:"status_msg"
-  string status_msg = 2;
-  // @gotags: json:"access_token"
-  string access_token = 3;
-}
-
-service UserService{
-  rpc RefreshAccessToken(AccessTokenRequest) returns (AccessTokenResponse){}
-  rpc UserRegister(UserRegisterRequest) returns (UserRegisterResponse){}
-  rpc Login(UserLoginRequest) returns (UserLoginResponse){}
-  rpc UserInfo(UserInfoRequest) returns (UserInfoResponse){}
+// GetUserInformation RPC 的请求消息
+message GetUserInformationRequest {
+  string uuid = 1; // 必需
 }

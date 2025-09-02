@@ -24,7 +24,7 @@ COPY cmd/video_service/ ./cmd/video_service/
 COPY internal/video/ ./internal/video/
 COPY pkg/ ./pkg/
 
-# 4. Build the video_service application
+# 4. Build the video_service service
 RUN export http_proxy=${HTTP_PROXY} && \
     export https_proxy=${HTTPS_PROXY} && \
     CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o /app/video_service ./cmd/video_service/main.go
@@ -41,5 +41,5 @@ COPY --from=builder /app/video_service .
 # Expose the port for the video service gRPC server
 EXPOSE 50052
 
-# The command to run the application
+# The command to run the service
 CMD ["/app/video_service"]

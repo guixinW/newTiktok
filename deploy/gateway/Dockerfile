@@ -26,7 +26,7 @@ COPY internal/gateway/ ./internal/gateway/
 # The gateway typically needs all shared packages and protobuf definitions.
 COPY pkg/ ./pkg/
 
-# 4. Build the gateway application
+# 4. Build the gateway service
 RUN export http_proxy=${HTTP_PROXY} && \
     export https_proxy=${HTTPS_PROXY} && \
     CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o /app/gateway ./cmd/gateway/main.go
@@ -44,5 +44,5 @@ COPY --from=builder /app/gateway .
 # Expose the port the HTTP gateway listens on
 EXPOSE 8081
 
-# The command to run the application
+# The command to run the service
 CMD ["/app/gateway"]

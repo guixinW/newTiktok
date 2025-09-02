@@ -1,4 +1,14 @@
-# Deployment for the user service
+# --- 第 1 部分：为用户服务创建 ConfigMap ---
+# 最佳实践：将配置与应用代码分离
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: user-service-config
+data:
+  MYSQL_DSN: "user:password@tcp(mysql-service:3306)/userdb?parseTime=true"
+---
+# --- 第 2 部分：修改后的 Deployment ---
+# 添加了 envFrom 来从 ConfigMap 注入环境变量
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -19,38 +29,29 @@ spec:
           imagePullPolicy: Never
           ports:
             - containerPort: 50051
-              name: grpc # 为端口添加名称是一个好习惯
-          env:
-            - name: CONFIG_PATH
-              value: "/app/config.yaml"
-          volumeMounts:
-            - name: config-volume
-              mountPath: /app/config.yaml
-              subPath: config.yaml
-      volumes:
-        - name: config-volume
-          configMap:
-            name: user-service-config
+              name: grpc
+
+          # --- 新增部分：从 ConfigMap 注入环境变量 ---
+          envFrom:
+            - configMapRef:
+                # 引用上面定义的 ConfigMap 的名称
+                name: user-service-config
 ---
-# Service to expose the user service deployment internally for Kong
+# --- 第 3 部分：原有的 Service 定义 ---
+# 无需改动
 apiVersion: v1
 kind: Service
 metadata:
   name: user-service
   annotations:
-    # MODIFICATION: Annotation moved here from the Deployment.
-    # This tells Kong to use the gRPC protocol when communicating with this Service.
     konghq.com/protocol: grpc
 spec:
-  # MODIFICATION: Changed from NodePort to ClusterIP.
-  # The Service only needs to be accessible inside the cluster by Kong.
   type: ClusterIP
   selector:
     app: user-service
   ports:
-    - name: grpc # 端口名称与容器端口的名称匹配
+    - name: grpc
       protocol: TCP
-      # RECOMMENDED: Explicitly declare the application protocol.
       appProtocol: grpc
       port: 50051
       targetPort: 50051
