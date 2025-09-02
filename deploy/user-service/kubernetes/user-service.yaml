@@ -5,7 +5,7 @@ kind: ConfigMap
 metadata:
   name: user-service-config
 data:
-  MYSQL_DSN: "user:password@tcp(mysql:3306)/userdb?parseTime=true"
+  MYSQL_DSN: "user:password@tcp(mysql-service:3306)/userdb?parseTime=true"
 ---
 # --- 第 2 部分：修改后的 Deployment ---
 # 添加了 envFrom 来从 ConfigMap 注入环境变量
@@ -30,9 +30,6 @@ spec:
           ports:
             - containerPort: 50051
               name: grpc
-          env:
-            - name: PORT
-              value: "50051"
 
           # --- 新增部分：从 ConfigMap 注入环境变量 ---
           envFrom:
