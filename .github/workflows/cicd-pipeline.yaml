@@ -128,8 +128,8 @@ jobs:
           echo "Applying manifest ${K8S_MANIFEST_PATH}"...
           kubectl apply -f $K8S_MANIFEST_PATH
           
-          echo "Restarting deployment 'deployment/${K8S_RESOURCE_NAME}' to apply changes..."
-          kubectl rollout restart deployment/${K8S_RESOURCE_NAME}
+          echo "Restarting deployment 'deployment/${K8S_RESOURCE_NAME}-deployment' to apply changes..."
+          kubectl rollout restart deployment/${K8S_RESOURCE_NAME}-deployment
           
           echo "Waiting for deployment to complete..."
-          kubectl rollout status deployment/${K8S_RESOURCE_NAME} --timeout=60s
+          kubectl rollout status deployment/${K8S_RESOURCE_NAME}-deployment --timeout=60s
