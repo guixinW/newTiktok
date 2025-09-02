@@ -51,8 +51,16 @@ jobs:
         with:
           fetch-depth: 0 # Fetch all history for git diff
 
-      - name: Install jq
-        run: sudo apt-get update && sudo apt-get install -y jq
+      - name: Install jq if not present
+        run: |
+          if ! command -v jq &> /dev/null
+          then
+              echo "jq could not be found, installing it..."
+              sudo apt-get update
+              sudo apt-get install -y jq
+          else
+              echo "jq is already installed."
+          fi
 
       - name: Identify changed services
         id: set-matrix
