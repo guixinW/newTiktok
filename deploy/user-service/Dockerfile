@@ -22,11 +22,11 @@ RUN export http_proxy=${HTTP_PROXY} && \
     go mod download
 
 # 3. 精细化地复制构建所需的源代码
-# 这是最关键的优化：只复制当前服务（user_service）真正依赖的目录。
+# 这是最关键的优化：只复制当前服务（user-service）真正依赖的目录。
 # 这样，当其他服务（如 internal/video/）的代码变更时，不会影响本服务的构建缓存。
-COPY cmd/user_service/ ./cmd/user_service/
+COPY cmd/user-service/ ./cmd/user-service/
 COPY internal/user/ ./internal/user
-COPY pkg/ ./pkg
+COPY internal/common/ ./common/user
 
 # 4. 编译应用
 # CGO_ENABLED=0 创建一个静态链接的二进制文件，不依赖任何系统的 C 库。
@@ -35,7 +35,7 @@ COPY pkg/ ./pkg
 # -installsuffix cgo 避免使用标准库的缓存。
 RUN export http_proxy=${HTTP_PROXY} && \
     export https_proxy=${HTTPS_PROXY} && \
-    CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o /app/user_service ./cmd/user_service/main.go
+    CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o /app/user-service ./cmd/user-service/main.go
 
 
 # Stage 2: Final
@@ -50,10 +50,10 @@ WORKDIR /app
 # 而不是直接打包进镜像。你的代码 `config.LoadConfig()` 需要适配这种方式。
 
 # 从 builder 阶段仅复制编译好的二进制文件
-COPY --from=builder /app/user_service .
+COPY --from=builder /app/user-service .
 
 # 暴露 gRPC 服务监听的端口
 EXPOSE 50051
 
 # 容器启动时运行的命令
-CMD ["/app/user_service"]
+CMD ["/app/user-service"]
