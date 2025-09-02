@@ -1,21 +1,22 @@
-name: Go CI/CD to Kind
+name: Local Kind CI/CD Pipeline
 
 on:
   push:
     branches:
-      - master
+      - main
     paths:
-      - 'cmd/**'
       - 'internal/**'
+      - 'cmd/**'
       - 'deploy/**'
-      - 'api/**'
-      - 'pkg/**'
-      - 'go.mod'
-      - 'go.sum'
-      - '.github/workflows/cicd-pipeline.yaml'
+
+# Global environment variables
+env:
+  KIND_CLUSTER_NAME: dev-cluster
+  # You can override these proxy settings in your repository's secrets if needed
+  HTTP_PROXY_URL: http://host.docker.internal:7897
+  HTTPS_PROXY_URL: http://host.docker.internal:7897
 
 jobs:
-  # --- Job 1: 持续集成 (CI) - 负责代码质量检查 ---
   ci-check:
     runs-on: self-hosted
     steps:
@@ -28,7 +29,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.23.0'
+          go-version: '1.23.3' # Using version from GEMINI.md
           cache: false # Disable caching to prevent conflicts on self-hosted runner
 
       - name: Run Go Tests
@@ -39,132 +40,75 @@ jobs:
           go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
           $(go env GOPATH)/bin/golangci-lint run ./...
 
-  # --- Job 2: 持续部署 (CD) - 负责构建和部署 ---
-  build-and-deploy:
+  identify-changes:
     runs-on: self-hosted
-    needs: ci-check
-
+    outputs: 
+      services: ${{ steps.set-matrix.outputs.services }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
         with:
-          fetch-depth: 0 # Fetch all history for accurate diff
-          clean: true
+          fetch-depth: 0 # Fetch all history for git diff
 
-      - name: Detect changed services
-        id: changes
+      - name: Identify changed services
+        id: set-matrix
         run: |
-          # Get changed files using git diff
-          CHANGED_FILES=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }})
-          if [ -z "$CHANGED_FILES" ]; then
-            echo "No changes detected. Exiting."
-            echo "any_changed=false" >> $GITHUB_OUTPUT
-            exit 0
+          # Get a list of changed files since the last commit on the branch
+          changed_files=$(git diff --name-only HEAD^ HEAD)
+          
+          # Check if common directory was changed
+          if echo "$changed_files" | grep -q "internal/common/"; then
+            # If common changed, build all services by listing directories in cmd/
+            services=$(ls -d cmd/*/ | xargs -n 1 basename | jq -R . | jq -s .)
+          else
+            # Otherwise, get the unique service names from the changed paths
+            # e.g., internal/user/app.go -> user_service OR cmd/user_service/main.go -> user_service OR deploy/user_service/Dockerfile -> user_service
+            services=$(echo "$changed_files" | grep -E '^(internal|cmd|deploy)/' | sed -n -e 's|internal/\([^/]*\)/.*|\1_service|p' -e 's|cmd/\([^/]*\)/.*|\1|p' -e 's|deploy/\([^/]*\)/.*|\1|p' | sort -u | jq -R . | jq -s .)
           fi
+          
+          echo "Services to rebuild: $services"
+          echo "services=$services" >> $GITHUB_OUTPUT
 
-          # Set initial state
-          gateway_changed=false
-          user_service_changed=false
-          video_service_changed=false
+  build-and-deploy:
+    needs: [identify-changes, ci-check]
+    if: needs.identify-changes.outputs.services != '[]'
+    # This job must run on a self-hosted runner with Docker, Kind, and Kubectl installed
+    runs-on: self-hosted
+    strategy:
+      matrix:
+        service: ${{ fromJson(needs.identify-changes.outputs.services) }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
 
-          echo "Detected changed files:"
-          echo "$CHANGED_FILES"
-
-          # Define patterns for each service
-          gateway_patterns=("cmd/gateway/" "internal/gateway/" "deploy/gateway/" "api/" "pkg/" "go.mod" "go.sum" ".github/workflows/cicd-pipeline.yaml")
-          user_service_patterns=("cmd/user_service/" "internal/user/" "deploy/user-service/" "api/proto/v1/user.proto" "api/proto/v2/user.proto" "pkg/" "go.mod" "go.sum" ".github/workflows/cicd-pipeline.yaml")
-          video_service_patterns=("cmd/video_service/" "internal/video/" "deploy/video-service/" "api/proto/v1/video.proto" "pkg/" "go.mod" "go.sum" ".github/workflows/cicd-pipeline.yaml")
-
-          # Check each service
-          while IFS= read -r file; do
-            for pattern in "${gateway_patterns[@]}"; do
-              if [[ "$file" == $pattern* ]]; then gateway_changed=true; fi
-            done
-            for pattern in "${user_service_patterns[@]}"; do
-              if [[ "$file" == $pattern* ]]; then user_service_changed=true; fi
-            done
-            for pattern in "${video_service_patterns[@]}"; do
-              if [[ "$file" == $pattern* ]]; then video_service_changed=true; fi
-            done
-          done <<< "$CHANGED_FILES"
-
-          any_changed=false
-          if [[ "$gateway_changed" == true || "$user_service_changed" == true || "$video_service_changed" == true ]]; then
-            any_changed=true
-          fi
-
-          # Set outputs
-          echo "gateway=$gateway_changed" >> $GITHUB_OUTPUT
-          echo "user_service=$user_service_changed" >> $GITHUB_OUTPUT
-          echo "video_service=$video_service_changed" >> $GITHUB_OUTPUT
-          echo "any_changed=$any_changed" >> $GITHUB_OUTPUT
-          echo "all_changed_files<<EOF" >> $GITHUB_OUTPUT
-          echo "$CHANGED_FILES" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-
-      - name: Debug changed files output
-        if: always()
+      - name: Build Docker image
         run: |
-          echo "--- Verifying changed-files script outputs ---"
-          echo "any_changed: ${{ steps.changes.outputs.any_changed }}"
-          echo "gateway_changed: ${{ steps.changes.outputs.gateway }}"
-          echo "user_service_changed: ${{ steps.changes.outputs.user_service }}"
-          echo "video_service_changed: ${{ steps.changes.outputs.video_service }}"
-          echo "--------------------------------------------------"
-          echo "All changed files detected by the script:"
-          echo "${{ steps.changes.outputs.all_changed_files }}"
+          # Convert service name from 'user_service' to 'user-service' for the image tag
+          IMAGE_TAG_BASE=$(echo ${{ matrix.service }} | sed 's/_/-/g')
+          echo "Building ${IMAGE_TAG_BASE}:latest"...
+          
+          docker build -t ${IMAGE_TAG_BASE}:latest \
+            --build-arg HTTP_PROXY=${{ env.HTTP_PROXY_URL }} \
+            --build-arg HTTPS_PROXY=${{ env.HTTPS_PROXY_URL }} \
+            -f deploy/${{ matrix.service }}/Dockerfile .
 
-      # --- Build, Load, and Deploy changed services ---
-
-      - name: Build and Load Gateway
-        if: steps.changes.outputs.gateway == 'true'
+      - name: Load image into Kind
         run: |
-          echo "Building Gateway image..."
-          docker build -t gateway:latest \
-            --build-arg HTTP_PROXY=http://host.docker.internal:7897 \
-            --build-arg HTTPS_PROXY=http://host.docker.internal:7897 \
-            -f deploy/gateway/Dockerfile .
-          echo "Loading Gateway image into Kind..."
-          kind load docker-image gateway:latest --name dev-cluster
+          IMAGE_TAG_BASE=$(echo ${{ matrix.service }} | sed 's/_/-/g')
+          echo "Loading ${IMAGE_TAG_BASE}:latest into Kind cluster '${{ env.KIND_CLUSTER_NAME }}'"...
+          kind load docker-image ${IMAGE_TAG_BASE}:latest --name ${{ env.KIND_CLUSTER_NAME }}
 
-      - name: Build and Load User Service
-        if: steps.changes.outputs.user_service == 'true'
+      - name: Deploy to Kubernetes
         run: |
-          echo "Building User Service image..."
-          docker build -t user-service:latest \
-            --build-arg HTTP_PROXY=http://host.docker.internal:7897 \
-            --build-arg HTTPS_PROXY=http://host.docker.internal:7897 \
-            -f deploy/user-service/Dockerfile .
-          echo "Loading User Service image into Kind..."
-          kind load docker-image user-service:latest --name dev-cluster
-
-      - name: Build and Load Video Service
-        if: steps.changes.outputs.video_service == 'true'
-        run: |
-          echo "Building Video Service image..."
-          docker build -t video-service:latest \
-            --build-arg HTTP_PROXY=http://host.docker.internal:7897 \
-            --build-arg HTTPS_PROXY=http://host.docker.internal:7897 \
-            -f deploy/video-service/Dockerfile .
-          echo "Loading Video Service image into Kind..."
-          kind load docker-image video-service:latest --name dev-cluster
-
-      - name: Deploy services to Kubernetes
-        if: steps.changes.outputs.any_changed == 'true'
-        run: |
-          echo "Deploying changed services to Kubernetes..."
-          if [[ "${{ steps.changes.outputs.gateway }}" == "true" ]]; then
-            echo "Deploying Gateway..."
-            kubectl delete -f deploy/gateway/kubernetes/gateway.yaml
-            kubectl apply -f deploy/gateway/kubernetes/gateway.yaml
-          fi
-          if [[ "${{ steps.changes.outputs.user_service }}" == "true" ]]; then
-            echo "Deploying User Service..."
-            kubectl delete -f deploy/user-service/kubernetes/user-service.yaml
-            kubectl apply -f deploy/user-service/kubernetes/user-service.yaml
-          fi
-          if [[ "${{ steps.changes.outputs.video_service }}" == "true" ]]; then
-            echo "Deploying Video Service..."
-            kubectl delete -f deploy/video-service/kubernetes/video-service.yaml
-            kubectl apply -f deploy/video-service/kubernetes/video-service.yaml
-          fi
+          # Convert service name for manifest path and resource name
+          K8S_RESOURCE_NAME=$(echo ${{ matrix.service }} | sed 's/_/-/g')
+          K8S_MANIFEST_PATH="deploy/${{ matrix.service }}/kubernetes/${K8S_RESOURCE_NAME}.yaml"
+          
+          echo "Applying manifest ${K8S_MANIFEST_PATH}"...
+          kubectl apply -f $K8S_MANIFEST_PATH
+          
+          echo "Restarting deployment 'deployment/${K8S_RESOURCE_NAME}' to apply changes..."
+          kubectl rollout restart deployment/${K8S_RESOURCE_NAME}
+          
+          echo "Waiting for deployment to complete..."
+          kubectl rollout status deployment/${K8S_RESOURCE_NAME} --timeout=60s
