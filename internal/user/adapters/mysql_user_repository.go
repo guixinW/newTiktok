@@ -28,18 +28,6 @@ type MySQLUserRepository struct {
 	db *sql.DB
 }
 
-func (m MySQLUserRepository) marshalDomainUser(user *userDomain.User) mysqlUser {
-	mysqlUser := mysqlUser{
-		UserUUID:  user.UUID(),
-		Username:  user.Name(),
-		Age:       sql.NullInt16{Int16: int16(user.Age()), Valid: true},
-		Gender:    sql.NullInt16{Int16: int16(user.Gender()), Valid: true},
-		UpdatedAt: user.UpdatedAt(),
-		CreatedAt: user.CreatedAt(),
-	}
-	return mysqlUser
-}
-
 func (m MySQLUserRepository) unmarshalUser(user *mysqlUser) (*userDomain.User, error) {
 	return userDomain.UnmarshalUserFromDatabase(
 		user.UserUUID,
