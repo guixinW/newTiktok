@@ -26,7 +26,7 @@ RUN export http_proxy=${HTTP_PROXY} && \
 # 这样，当其他服务（如 internal/video/）的代码变更时，不会影响本服务的构建缓存。
 COPY cmd/user-service/ ./cmd/user-service/
 COPY internal/user/ ./internal/user
-COPY internal/common/ ./common/user
+COPY internal/common/ ./internal/common/
 
 # 4. 编译应用
 # CGO_ENABLED=0 创建一个静态链接的二进制文件，不依赖任何系统的 C 库。
