@@ -56,8 +56,17 @@ jobs:
           if ! command -v jq &> /dev/null
           then
               echo "jq could not be found, installing it..."
-              sudo apt-get update
-              sudo apt-get install -y jq
+              if [[ "$(uname)" == "Darwin" ]]; then
+                  echo "macOS detected, using Homebrew..."
+                  brew install jq
+              elif [[ "$(uname)" == "Linux" ]]; then
+                  echo "Linux detected, using apt-get..."
+                  sudo apt-get update
+                  sudo apt-get install -y jq
+              else
+                  echo "Unsupported OS for jq installation: $(uname)"
+                  exit 1
+              fi
           else
               echo "jq is already installed."
           fi
