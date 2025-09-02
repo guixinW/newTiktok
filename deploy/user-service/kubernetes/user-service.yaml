@@ -6,6 +6,7 @@ metadata:
   name: user-service-config
 data:
   MYSQL_DSN: "user:password@tcp(mysql-service:3306)/userdb?parseTime=true"
+  PORT: "50051"
 ---
 # --- 第 2 部分：修改后的 Deployment ---
 # 添加了 envFrom 来从 ConfigMap 注入环境变量
