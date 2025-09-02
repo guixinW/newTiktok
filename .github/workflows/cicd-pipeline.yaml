@@ -80,11 +80,11 @@ jobs:
           # Check if common directory or the workflow file was changed
           if echo "$changed_files" | grep -q "internal/common/" || echo "$changed_files" | grep -q ".github/workflows/cicd-pipeline.yaml"; then
             # If common changed, build all services by listing directories in cmd/
-            services=$(ls -d cmd/*/ | xargs -n 1 basename | jq -R . | jq -s .)
+            services=$(ls -d cmd/*/ | xargs -n 1 basename | jq -R . | jq -sc .)
           else
             # Otherwise, get the unique service names from the changed paths
             # e.g., internal/user/app.go -> user_service OR cmd/user_service/main.go -> user_service OR deploy/user_service/Dockerfile -> user_service
-            services=$(echo "$changed_files" | grep -E '^(internal|cmd|deploy)/' | sed -n -e 's|internal/\([^/]*\)/.*|\1_service|p' -e 's|cmd/\([^/]*\)/.*|\1|p' -e 's|deploy/\([^/]*\)/.*|\1|p' | sort -u | jq -R . | jq -s .)
+            services=$(echo "$changed_files" | grep -E '^(internal|cmd|deploy)/' | sed -n -e 's|internal/\([^/]*\)/.*|\1_service|p' -e 's|cmd/\([^/]*\)/.*|\1|p' -e 's|deploy/\([^/]*\)/.*|\1|p' | sort -u | jq -R . | jq -sc .)
           fi
           
           echo "Services to rebuild: $services"
