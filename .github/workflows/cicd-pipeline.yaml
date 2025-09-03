@@ -8,6 +8,7 @@ on:
       - 'internal/**'
       - 'cmd/**'
       - 'deploy/**'
+      - '!deploy/database/**'
       - '.github/workflows/cicd-pipeline.yaml'
 
 # Global environment variables
