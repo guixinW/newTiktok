@@ -6,10 +6,14 @@ spec:
   selector:
     app: kafka
   ports:
-    - name: plaintext
+    - name: internal
       protocol: TCP
       port: 9092
       targetPort: 9092
+    - name: external
+      protocol: TCP
+      port: 19092
+      targetPort: 19092
   # Headless service for stable network identity of StatefulSet pods
   clusterIP: None
 
@@ -29,50 +33,48 @@ spec:
       labels:
         app: kafka
     spec:
+      # Bitnami images require a specific security context to allow writing to the volume
+      securityContext:
+        fsGroup: 1001
+        runAsUser: 1001
       containers:
         - name: kafka
-          image: confluentinc/cp-kafka:latest
+          image: bitnami/kafka:latest
           ports:
             - containerPort: 9092
-              name: plaintext
+              name: internal
             - containerPort: 19092
               name: external
-            - containerPort: 9093
-              name: controller
           env:
-            # KRaft settings
-            - name: KAFKA_NODE_ID
-              value: "1"
-            - name: KAFKA_PROCESS_ROLES
+            # KRaft settings using Bitnami's environment variable format
+            - name: KAFKA_CFG_PROCESS_ROLES
               value: "broker,controller"
-            - name: KAFKA_CONTROLLER_LISTENER_NAMES
+            - name: KAFKA_CFG_NODE_ID
+              value: "0"
+            - name: KAFKA_CFG_CONTROLLER_LISTENER_NAMES
               value: "CONTROLLER"
-            - name: KAFKA_LISTENERS
+            - name: KAFKA_CFG_LISTENERS
               value: "INTERNAL://:9092,CONTROLLER://:9093,EXTERNAL://:19092"
-            # Use the stable network ID from the StatefulSet (<pod-name>.<service-name>)
-            - name: KAFKA_ADVERTISED_LISTENERS
+            - name: KAFKA_CFG_ADVERTISED_LISTENERS
               value: "INTERNAL://kafka-0.kafka-service:9092,EXTERNAL://localhost:19092"
-            - name: KAFKA_LISTENER_SECURITY_PROTOCOL_MAP
+            - name: KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP
               value: "CONTROLLER:PLAINTEXT,INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT"
-            - name: KAFKA_INTER_BROKER_LISTENER_NAME
+            - name: KAFKA_CFG_INTER_BROKER_LISTENER_NAME
               value: "INTERNAL"
-            - name: KAFKA_CONTROLLER_QUORUM_VOTERS
-              value: "1@kafka-0.kafka-service:9093"
-            # A static cluster ID. In production, generate this once and store it securely.
-            - name: CLUSTER_ID
-              value: "ciVva3vjS2iA5hJ2wJ2wFw"
+            - name: KAFKA_CFG_CONTROLLER_QUORUM_VOTERS
+              value: "0@kafka-0.kafka-service:9093"
             
             # Settings for single-broker cluster
-            - name: KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR
+            - name: KAFKA_CFG_OFFSETS_TOPIC_REPLICATION_FACTOR
               value: "1"
-            - name: KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR
+            - name: KAFKA_CFG_TRANSACTION_STATE_LOG_REPLICATION_FACTOR
               value: "1"
-            - name: KAFKA_TRANSACTION_STATE_LOG_MIN_ISR
+            - name: KAFKA_CFG_TRANSACTION_STATE_LOG_MIN_ISR
               value: "1"
 
           volumeMounts:
             - name: kafka-storage
-              mountPath: /var/lib/kafka/data
+              mountPath: /bitnami/kafka
   # Define a PersistentVolumeClaim template. This will automatically create a PVC for each pod.
   volumeClaimTemplates:
     - metadata:
