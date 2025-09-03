@@ -1,0 +1,79 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: kafka-service
+spec:
+  selector:
+    app: kafka
+  ports:
+    - name: plaintext
+      protocol: TCP
+      port: 9092
+      targetPort: 9092
+  # Headless service for stable network identity of StatefulSet pods
+  clusterIP: None
+
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: kafka
+spec:
+  serviceName: "kafka-service"
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kafka
+  template:
+    metadata:
+      labels:
+        app: kafka
+    spec:
+      containers:
+        - name: kafka
+          image: confluentinc/cp-kafka:latest
+          ports:
+            - containerPort: 9092
+              name: plaintext
+            - containerPort: 9093
+              name: controller
+          env:
+            # KRaft settings
+            - name: KAFKA_NODE_ID
+              value: "1"
+            - name: KAFKA_PROCESS_ROLES
+              value: "broker,controller"
+            - name: KAFKA_CONTROLLER_LISTENER_NAMES
+              value: "CONTROLLER"
+            - name: KAFKA_LISTENERS
+              value: "PLAINTEXT://:9092,CONTROLLER://:9093"
+            # Use the stable network ID from the StatefulSet (<pod-name>.<service-name>)
+            - name: KAFKA_ADVERTISED_LISTENERS
+              value: "PLAINTEXT://kafka-0.kafka-service:9092"
+            - name: KAFKA_CONTROLLER_QUORUM_VOTERS
+              value: "1@kafka-0.kafka-service:9093"
+            # A static cluster ID. In production, generate this once and store it securely.
+            - name: CLUSTER_ID
+              value: "ciVva3vjS2iA5hJ2wJ2wFw"
+            
+            # Settings for single-broker cluster
+            - name: KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR
+              value: "1"
+            - name: KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR
+              value: "1"
+            - name: KAFKA_TRANSACTION_STATE_LOG_MIN_ISR
+              value: "1"
+
+          volumeMounts:
+            - name: kafka-storage
+              mountPath: /var/lib/kafka/data
+  # Define a PersistentVolumeClaim template. This will automatically create a PVC for each pod.
+  volumeClaimTemplates:
+    - metadata:
+        name: kafka-storage
+      spec:
+        accessModes: [ "ReadWriteOnce" ]
+        storageClassName: "manual" # Must match the PV's storageClassName
+        resources:
+          requests:
+            storage: 5Gi # Must be less than or equal to the PV's capacity

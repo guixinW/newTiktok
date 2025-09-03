@@ -14,7 +14,7 @@ echo "📍 工作目录: $SCRIPT_DIR"
 
 # 创建数据目录
 echo "📁 创建数据持久化目录..."
-mkdir -p "$SCRIPT_DIR/data/mysql" "$SCRIPT_DIR/data/redis" "$SCRIPT_DIR/data/etcd"
+mkdir -p "$SCRIPT_DIR/data/mysql" "$SCRIPT_DIR/data/redis" "$SCRIPT_DIR/data/etcd" "$SCRIPT_DIR/data/kafka"
 echo "✅ 数据目录创建完成: $SCRIPT_DIR/data/mysql, $SCRIPT_DIR/data/redis, $SCRIPT_DIR/data/etcd"
 
 # 检查kind配置文件是否存在
@@ -114,6 +114,8 @@ kubectl apply -f ../deploy/database/redis-pv.yaml
 kubectl apply -f ../deploy/database/redis.yaml
 kubectl apply -f ../deploy/database/etcd-pv.yaml
 kubectl apply -f ../deploy/database/etcd.yaml
+kubectl apply -f ../deploy/database/kafka-pv.yaml
+kubectl apply -f ../deploy/database/kafka.yaml
 echo "✅ 数据库部署完成!"
 
 echo "🎉 所有部署完成!"
