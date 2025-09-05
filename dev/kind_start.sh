@@ -118,5 +118,18 @@ kubectl apply -f ../deploy/database/kafka-pv.yaml
 kubectl apply -f ../deploy/database/kafka.yaml
 echo "✅ 数据库部署完成!"
 
+echo ""
+echo "🚀 正在部署 Kong Gateway..."
+# 调用 apply-config.sh 脚本来部署或更新 Kong
+# 使用 -P 选项来解析 ../deploy/kong 的真实路径
+KONG_SCRIPT_PATH=$(realpath "$SCRIPT_DIR/../deploy/kong/apply-config.sh")
+if [ -f "$KONG_SCRIPT_PATH" ]; then
+    cd "$(dirname "$KONG_SCRIPT_PATH")" && ./apply-config.sh
+    echo "✅ Kong Gateway 部署/更新完成!"
+else
+    echo "⚠️ 警告: 未找到 Kong 部署脚本: $KONG_SCRIPT_PATH"
+fi
+
+
 echo "🎉 所有部署完成!"
 echo "✨ 集群 'dev-cluster' 已准备就绪!"
