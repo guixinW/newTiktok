@@ -1,0 +1,37 @@
+syntax = "proto3";
+
+service UserService {
+  // 按照您的示例，添加 HTTP 注解
+  // 注意：为通过语法检查，返回值已临时修改为 User
+  rpc CreateUser(CreateUserRequest) returns (User) {
+    option (google.api.http) = {
+      post: "/users",
+      body: "*"
+    };
+  }
+
+  // 暂时注释掉其他方法以简化调试
+  // rpc UpdateUser(UpdateUserRequest) returns (google.protobuf.Empty);
+  // rpc GetUserInformation(GetUserInformationRequest) returns (User);
+}
+
+// --- 消息定义 ---
+
+message User {
+  string uuid = 1;
+  string name = 2;
+  uint32 age = 3;
+  uint32 gender = 4;
+  uint64 following_count = 5;
+  uint64 follower_count = 6;
+  uint64 total_favorite = 7;
+  uint64 work_count = 8;
+  uint64 favorite_count = 9;
+}
+
+message CreateUserRequest {
+  string uuid = 1;
+  string name = 2;
+  uint32 age = 3;
+  uint32 gender = 4;
+}

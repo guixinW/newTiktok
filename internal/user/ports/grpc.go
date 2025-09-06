@@ -5,6 +5,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
+	"log"
 	"newTiktoken/internal/common/auth"
 	userPb "newTiktoken/internal/common/genproto/user"
 	"newTiktoken/internal/user/app"
@@ -28,6 +29,7 @@ func (g *GrpcServer) CreateUser(ctx context.Context, req *userPb.CreateUserReque
 		Age:    uint16(req.GetAge()),
 		Gender: uint16(req.GetGender()),
 	}); err != nil {
+		log.Printf("ERROR: failed to handle command: %v", err)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	return &emptypb.Empty{}, nil
@@ -40,6 +42,7 @@ func (g *GrpcServer) UpdateUser(ctx context.Context, req *userPb.UpdateUserReque
 		Age:    uint16(req.GetAge()),
 		Gender: uint16(req.GetGender()),
 	}); err != nil {
+		log.Printf("ERROR: failed to handle command: %v", err)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	return &emptypb.Empty{}, nil

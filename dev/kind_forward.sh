@@ -24,6 +24,7 @@ SERVICES=(
   "user-service default 50051:50051"
   "video-service default 50052:50052"
   "gateway-service default 8081:8081"
+  "kong-kong-proxy kong 8000:80" # Forward Kong proxy to localhost:8000
 )
 
 # 用于存储后台进程ID (PID) 的文件
