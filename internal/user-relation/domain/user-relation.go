@@ -6,14 +6,6 @@ import (
 	"time"
 )
 
-type RelationActionType int
-
-const (
-	Follow RelationActionType = iota
-	Unfollow
-	Block
-)
-
 // UserRelation 是用户关系领域的核心实体
 type UserRelation struct {
 	ActivePartyUUID  string
@@ -58,4 +50,19 @@ func (r *UserRelation) Unfollow() {
 func (r *UserRelation) Block() {
 	r.Status = Block
 	r.UpdatedAt = time.Now()
+}
+
+func UnmarshalUserRelationFromDatabase(
+	activePartyUUID string,
+	passivePartyUUID string,
+	status RelationActionType,
+	createdAt time.Time,
+	updatedAt time.Time) (*UserRelation, error) {
+	userRelation, err := NewUserRelation(activePartyUUID, passivePartyUUID, status)
+	if err != nil {
+		return nil, err
+	}
+	userRelation.CreatedAt = createdAt
+	userRelation.UpdatedAt = updatedAt
+	return userRelation, nil
 }
