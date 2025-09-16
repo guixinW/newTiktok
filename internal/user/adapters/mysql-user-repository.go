@@ -89,7 +89,12 @@ func (m MySQLUserRepository) UpdateUser(ctx context.Context, userUUID string, up
 	}
 
 	updateQuery := "UPDATE users SET user_name = ?, age = ?, gender = ?, updated_at = ? WHERE user_uuid = ?"
-	_, err = tx.ExecContext(ctx, updateQuery, updatedDomainUser.Name(), updatedDomainUser.Age(), updatedDomainUser.Gender(), time.Now().UTC(), updatedDomainUser.UUID())
+	_, err = tx.ExecContext(ctx, updateQuery,
+		updatedDomainUser.Name(),
+		updatedDomainUser.Age(),
+		updatedDomainUser.Gender(),
+		time.Now().UTC(),
+		updatedDomainUser.UUID())
 	if err != nil {
 		return errors.Wrap(err, "failed to execute user update")
 	}
